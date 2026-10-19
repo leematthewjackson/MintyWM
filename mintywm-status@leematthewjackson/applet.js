@@ -1,5 +1,16 @@
 // MintyWM Status - panel indicator for the MintyWM extension.
 // By Lee Matthew Jackson - leematthewjackson.com
+//
+// Copyright (C) 2026 Lee Matthew Jackson
+// SPDX-License-Identifier: GPL-3.0-or-later
+//
+// This program is free software: you can redistribute it and/or modify it under
+// the terms of the GNU General Public License as published by the Free Software
+// Foundation, either version 3 of the License, or (at your option) any later version.
+// It is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY;
+// without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR
+// PURPOSE. See the GNU General Public License (the LICENSE file) for details.
+//
 // REQUIRES the MintyWM extension (mintywm@leematthewjackson) to be installed and enabled.
 // Shows tiling on/off for the workspace you are on, and the window count.
 // Click to turn tiling on/off for the current workspace (or to resume it if paused everywhere).
