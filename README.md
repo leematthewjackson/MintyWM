@@ -8,6 +8,12 @@ It does not try to replace Cinnamon features. Moving windows between workspaces,
 
 By [Lee Matthew Jackson](https://leematthewjackson.com) · Mastodon: [@leematthewjackson@mastodon.social](https://mastodon.social/@leematthewjackson)
 
+Look at my "rice" :D
+
+<img width="3840" height="2160" alt="image" src="https://github.com/user-attachments/assets/8a30becd-04ed-447c-8047-3a59e43ec3ae" />
+
+<img width="3840" height="2160" alt="image" src="https://github.com/user-attachments/assets/04513454-dafa-4be6-9dbd-bd9771e2c522" />
+
 ---
 
 ## What's in this repo
@@ -139,6 +145,9 @@ xprop WM_CLASS
 
 The output looks like `WM_CLASS(STRING) = "instance", "ClassName"`. Either part works as a rule. Or just focus the window and press **Super + Shift + F**.
 
+<img width="1079" height="1003" alt="image" src="https://github.com/user-attachments/assets/f6e57040-0e68-4cdf-b6ac-2af0baa88754" />
+
+
 ### Workspaces
 
 To keep tiling off on some workspaces, list their numbers (as Cinnamon shows them, starting at 1) in **Tiling → Workspaces**:
@@ -148,6 +157,7 @@ To keep tiling off on some workspaces, list their numbers (as Cinnamon shows the
 7-9         → workspaces 7, 8 and 9
 2, 5-6      → 2, 5 and 6
 ```
+<img width="875" height="811" alt="image" src="https://github.com/user-attachments/assets/1158b375-8398-488d-8bc7-7c9978f12814" />
 
 Or just press **Super + Alt + T** on a workspace and it is added to or removed from the list for you.
 
@@ -170,6 +180,9 @@ Applet settings: show or hide the count label, and choose a **symbolic** icon (m
 ## Settings reference
 
 Open **System Settings → Extensions → MintyWM → Configure** (the gear icon). Changes apply immediately.
+
+<img width="825" height="907" alt="image" src="https://github.com/user-attachments/assets/0d52e981-bb5b-48ab-8368-9130f8f798bd" />
+
 
 | Page | Option | Default |
 |---|---|---|
