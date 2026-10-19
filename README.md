@@ -8,8 +8,6 @@ It does not try to replace Cinnamon features. Moving windows between workspaces,
 
 By [Lee Matthew Jackson](https://leematthewjackson.com) · Mastodon: [@leematthewjackson@mastodon.social](https://mastodon.social/@leematthewjackson)
 
-<!-- Add a screenshot or GIF here: ![MintyWM](docs/screenshot.png) -->
-
 ---
 
 ## What's in this repo
@@ -221,6 +219,8 @@ Open **System Settings → Extensions → MintyWM → Configure** (the gear icon
 ## Repository layout
 
 ```
+LICENSE                               GPL-3.0 full text
+README.md                             This file
 mintywm@leematthewjackson/            The extension
 ├── extension.js                      Tiling logic
 ├── settings-schema.json              Settings panel definition
@@ -241,7 +241,15 @@ mintywm-status@leematthewjackson/     The optional panel applet
 
 ## Licence
 
-*Add your chosen licence here (GPL-3.0 is a common choice for Cinnamon extensions) and include a `LICENSE` file in the repo.*
+MintyWM is free software, released under the **GNU General Public License v3.0**. You can use, study, share and modify it, and if you distribute a modified version it must stay under the same licence. See the [`LICENSE`](LICENSE) file for the full text.
+
+Copyright (C) 2026 Lee Matthew Jackson
+
+## Disclaimer
+
+MintyWM is a hobby project, written in my spare time and tested on my own machines. I've done my best, but it comes with **no warranty of any kind**, and you use it **at your own risk**. As set out in sections 15 and 16 of the GPL-3.0, I'm not liable for any damage, data loss or other problems that result from using it.
+
+It moves and resizes windows, so it's worth saving your work before trying it. If something goes wrong, disable it under **System Settings → Extensions** and restart Cinnamon (Alt+F2, `r`). Bug reports and pull requests are welcome, but I can't promise support or fixes.
 
 ## Author
 
