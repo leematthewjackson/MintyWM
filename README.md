@@ -6,6 +6,9 @@ A small, from-scratch auto-tiling extension for the Cinnamon desktop (Muffin / G
 
 It does not try to replace Cinnamon features. Moving windows between workspaces, Alt+Tab, panels and the rest all stay as they are.
 
+> [!WARNING]
+> **Alpha software.** MintyWM is brand new, so don't expect miracles. Things will break and settings may change. **Please [report bugs here](https://github.com/leematthewjackson/MintyWM/issues/new)**, with your distro, Cinnamon version and what happened. Thank you!
+
 By [Lee Matthew Jackson](https://leematthewjackson.com) · Mastodon: [@leematthewjackson@mastodon.social](https://mastodon.social/@leematthewjackson)
 
 ## Watch the demo
