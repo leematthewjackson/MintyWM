@@ -8,6 +8,12 @@ It does not try to replace Cinnamon features. Moving windows between workspaces,
 
 By [Lee Matthew Jackson](https://leematthewjackson.com) · Mastodon: [@leematthewjackson@mastodon.social](https://mastodon.social/@leematthewjackson)
 
+## Watch the demo
+
+[![MintyWM demo video on YouTube](https://img.youtube.com/vi/CHejYv80eo8/maxresdefault.jpg)](https://youtu.be/CHejYv80eo8)
+
+▶️ **[Watch the MintyWM demo on YouTube](https://youtu.be/CHejYv80eo8)**: auto-tiling, floating windows, shortcuts and per-workspace switching in action.
+
 Look at my "rice" :D
 
 <img width="3840" height="2160" alt="image" src="https://github.com/user-attachments/assets/8a30becd-04ed-447c-8047-3a59e43ec3ae" />
