@@ -1,0 +1,16 @@
+{
+    "showLabel": {
+        "type": "switch",
+        "default": true,
+        "description": "Show the window count (or \"off\") next to the icon"
+    },
+    "iconStyle": {
+        "type": "combobox",
+        "default": "symbolic",
+        "description": "Panel icon",
+        "options": {
+            "Symbolic (matches your theme)": "symbolic",
+            "Full colour": "colour"
+        }
+    }
+}

@@ -1,0 +1,383 @@
+{
+    "layout": {
+        "type": "layout",
+        "pages": [
+            "page-tiling",
+            "page-floating",
+            "page-borders",
+            "page-keys",
+            "page-about"
+        ],
+        "page-tiling": {
+            "type": "page",
+            "title": "Tiling",
+            "sections": [
+                "sec-gaps",
+                "sec-sizes",
+                "sec-floatwin",
+                "sec-workspaces",
+                "sec-feedback"
+            ]
+        },
+        "page-floating": {
+            "type": "page",
+            "title": "Floating apps",
+            "sections": [
+                "sec-float-help",
+                "sec-float-list"
+            ]
+        },
+        "page-borders": {
+            "type": "page",
+            "title": "Borders",
+            "sections": [
+                "sec-borders"
+            ]
+        },
+        "page-keys": {
+            "type": "page",
+            "title": "Keyboard",
+            "sections": [
+                "sec-keys-modes",
+                "sec-keys-focus"
+            ]
+        },
+        "page-about": {
+            "type": "page",
+            "title": "About",
+            "sections": [
+                "sec-about"
+            ]
+        },
+        "sec-gaps": {
+            "type": "section",
+            "title": "Gaps",
+            "keys": [
+                "innerGap",
+                "outerGap"
+            ]
+        },
+        "sec-sizes": {
+            "type": "section",
+            "title": "Window sizes",
+            "keys": [
+                "minTileWidth",
+                "minTileHeight",
+                "floatSizePercent"
+            ]
+        },
+        "sec-floatwin": {
+            "type": "section",
+            "title": "Floating windows",
+            "keys": [
+                "floatOnTop"
+            ]
+        },
+        "sec-workspaces": {
+            "type": "section",
+            "title": "Workspaces",
+            "keys": [
+                "wsHelp",
+                "noTileWorkspaces"
+            ]
+        },
+        "sec-feedback": {
+            "type": "section",
+            "title": "Feedback",
+            "keys": [
+                "notify"
+            ]
+        },
+        "sec-borders": {
+            "type": "section",
+            "title": "Focus and floating borders",
+            "keys": [
+                "borders",
+                "focusColor",
+                "floatColor",
+                "borderWidth",
+                "cornerRadius"
+            ]
+        },
+        "sec-keys-modes": {
+            "type": "section",
+            "title": "Tiling and floating",
+            "keys": [
+                "keyToggleTiling",
+                "keyToggleWorkspace",
+                "keyToggleFloat",
+                "keyAlwaysFloat",
+                "keyRetile"
+            ]
+        },
+        "sec-keys-focus": {
+            "type": "section",
+            "title": "Focus and arrangement",
+            "keys": [
+                "keyFocusNext",
+                "keyFocusPrev",
+                "keySwapNext",
+                "keySwapPrev",
+                "keyMakeFirst"
+            ]
+        },
+        "sec-about": {
+            "type": "section",
+            "title": "MintyWM",
+            "keys": [
+                "aboutName",
+                "aboutAuthor",
+                "aboutWebsite",
+                "aboutMastodon"
+            ]
+        },
+        "sec-float-help": {
+            "type": "section",
+            "title": "How it works",
+            "keys": [
+                "floatHelp1",
+                "floatHelp2",
+                "floatHelp3",
+                "floatHelp4",
+                "floatHelp5"
+            ]
+        },
+        "sec-float-list": {
+            "type": "section",
+            "title": "Apps that open floating",
+            "keys": [
+                "floatRules"
+            ]
+        }
+    },
+    "innerGap": {
+        "type": "spinbutton",
+        "default": 6,
+        "min": 0,
+        "max": 64,
+        "step": 1,
+        "units": "px",
+        "description": "Gap between windows"
+    },
+    "outerGap": {
+        "type": "spinbutton",
+        "default": 6,
+        "min": 0,
+        "max": 64,
+        "step": 1,
+        "units": "px",
+        "description": "Gap between windows and the screen or panel edges",
+        "tooltip": "The focus border is drawn in this gap, so keep it at least as wide as the border."
+    },
+    "minTileWidth": {
+        "type": "spinbutton",
+        "default": 200,
+        "min": 0,
+        "max": 2000,
+        "step": 10,
+        "units": "px",
+        "description": "Smallest tile width",
+        "tooltip": "When more windows are open than fit, the extra ones are left where they are. 0 means no limit."
+    },
+    "minTileHeight": {
+        "type": "spinbutton",
+        "default": 120,
+        "min": 0,
+        "max": 2000,
+        "step": 10,
+        "units": "px",
+        "description": "Smallest tile height",
+        "tooltip": "When more windows are open than fit, the extra ones are left where they are. 0 means no limit."
+    },
+    "floatSizePercent": {
+        "type": "spinbutton",
+        "default": 60,
+        "min": 20,
+        "max": 90,
+        "step": 5,
+        "units": "%",
+        "description": "Size of a newly floated window",
+        "tooltip": "Used when a window you float has no sensible earlier size. It is centred on its monitor."
+    },
+    "notify": {
+        "type": "switch",
+        "default": true,
+        "description": "Show a notification when tiling or floating is toggled"
+    },
+    "borders": {
+        "type": "switch",
+        "default": true,
+        "description": "Draw a border around the focused and floating windows"
+    },
+    "focusColor": {
+        "type": "colorchooser",
+        "default": "rgb(0,255,204)",
+        "description": "Focused window",
+        "dependency": "borders"
+    },
+    "floatColor": {
+        "type": "colorchooser",
+        "default": "rgb(255,0,255)",
+        "description": "Floating window (not focused)",
+        "dependency": "borders"
+    },
+    "borderWidth": {
+        "type": "spinbutton",
+        "default": 2,
+        "min": 1,
+        "max": 6,
+        "step": 1,
+        "units": "px",
+        "description": "Border thickness",
+        "dependency": "borders"
+    },
+    "cornerRadius": {
+        "type": "spinbutton",
+        "default": 8,
+        "min": 0,
+        "max": 24,
+        "step": 1,
+        "units": "px",
+        "description": "Window corner radius",
+        "tooltip": "Match your theme's window corners so the border hugs them.",
+        "dependency": "borders"
+    },
+    "keyToggleTiling": {
+        "type": "keybinding",
+        "default": "<Super>t",
+        "description": "Pause or resume tiling everywhere"
+    },
+    "keyToggleFloat": {
+        "type": "keybinding",
+        "default": "<Super>f",
+        "description": "Float or tile the focused window"
+    },
+    "keyRetile": {
+        "type": "keybinding",
+        "default": "<Super><Shift>t",
+        "description": "Re-tile everything now"
+    },
+    "keyFocusNext": {
+        "type": "keybinding",
+        "default": "<Super>j",
+        "description": "Focus the next window"
+    },
+    "keyFocusPrev": {
+        "type": "keybinding",
+        "default": "<Super>k",
+        "description": "Focus the previous window"
+    },
+    "keySwapNext": {
+        "type": "keybinding",
+        "default": "<Super><Shift>j",
+        "description": "Swap the focused tile with the next one"
+    },
+    "keySwapPrev": {
+        "type": "keybinding",
+        "default": "<Super><Shift>k",
+        "description": "Swap the focused tile with the previous one"
+    },
+    "keyMakeFirst": {
+        "type": "keybinding",
+        "default": "<Super><Shift>h",
+        "description": "Move the focused window to the first (big, left) slot"
+    },
+    "aboutName": {
+        "type": "label",
+        "description": "MintyWM - Dynamic Tiling Window Management for Cinnamon"
+    },
+    "aboutAuthor": {
+        "type": "label",
+        "description": "By Lee Matthew Jackson"
+    },
+    "aboutWebsite": {
+        "type": "label",
+        "description": "Website: leematthewjackson.com"
+    },
+    "aboutMastodon": {
+        "type": "label",
+        "description": "Mastodon: @leematthewjackson@mastodon.social"
+    },
+    "floatHelp1": {
+        "type": "label",
+        "description": "These apps open as floating windows instead of being tiled. Untick a row to stop floating that app, or delete the row."
+    },
+    "floatHelp2": {
+        "type": "label",
+        "description": "Easiest way to add an app: click its window and press Super+Shift+F. Press it again to undo."
+    },
+    "floatHelp3": {
+        "type": "label",
+        "description": "Or find a window's class yourself: in a terminal run  xprop WM_CLASS  then click the window, and use the first name in quotes."
+    },
+    "floatHelp4": {
+        "type": "label",
+        "description": "A * matches anything, so  cinnamon-settings*  covers every Cinnamon Settings window. Capital letters do not matter."
+    },
+    "floatHelp5": {
+        "type": "label",
+        "description": "Title contains is optional: leave it empty to float every window of that app. Super+F on one window tiles just that window and leaves this list alone."
+    },
+    "floatRules": {
+        "type": "list",
+        "description": "Apps that open floating",
+        "columns": [
+            {
+                "id": "enabled",
+                "title": "Float",
+                "type": "boolean",
+                "default": true
+            },
+            {
+                "id": "wmclass",
+                "title": "Window class",
+                "type": "string",
+                "default": ""
+            },
+            {
+                "id": "title",
+                "title": "Title contains (optional)",
+                "type": "string",
+                "default": ""
+            }
+        ],
+        "default": [
+            {
+                "enabled": true,
+                "wmclass": "cinnamon-settings*",
+                "title": ""
+            },
+            {
+                "enabled": true,
+                "wmclass": "xlet-settings*",
+                "title": ""
+            }
+        ]
+    },
+    "keyAlwaysFloat": {
+        "type": "keybinding",
+        "default": "<Super><Shift>f",
+        "description": "Always float (or stop floating) the focused window's app"
+    },
+    "floatOnTop": {
+        "type": "switch",
+        "default": true,
+        "description": "Keep floating windows on top of the tiled ones",
+        "tooltip": "Only windows MintyWM floats are affected, and only while tiling is on. Windows you pinned on top yourself are left alone."
+    },
+    "wsHelp": {
+        "type": "label",
+        "description": "Tiling is never applied on the workspaces listed here. Super+Alt+T flips the workspace you are on and updates this box."
+    },
+    "noTileWorkspaces": {
+        "type": "entry",
+        "default": "",
+        "description": "Workspaces where tiling is off",
+        "tooltip": "Workspace numbers as Cinnamon shows them, for example: 4, 9   or   7-9. Leave empty to tile everywhere."
+    },
+    "keyToggleWorkspace": {
+        "type": "keybinding",
+        "default": "<Super><Alt>t",
+        "description": "Turn tiling on or off for this workspace"
+    }
+}

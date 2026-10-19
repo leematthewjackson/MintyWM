@@ -1,0 +1,16 @@
+{
+    "uuid": "mintywm-status@leematthewjackson",
+    "name": "MintyWM Status",
+    "description": "Panel indicator for the MintyWM tiling extension: shows whether tiling is on for the current workspace and how many windows are tiled; click to toggle. Requires the MintyWM extension to be installed and enabled.",
+    "version": "0.6",
+    "author": "Lee Matthew Jackson",
+    "website": "https://leematthewjackson.com",
+    "max-instances": 1,
+    "cinnamon-version": [
+        "6.0",
+        "6.2",
+        "6.4",
+        "6.6",
+        "6.8"
+    ]
+}
