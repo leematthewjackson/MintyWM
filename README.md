@@ -59,11 +59,11 @@ unzip -oq ~/Downloads/mintywm-status-applet-0.6.zip -d ~/.local/share/cinnamon/a
 ### From this repository
 
 ```bash
-git clone <your-repo-url> mintywm
+git clone https://github.com/leematthewjackson/MintyWM.git mintywm
 cd mintywm
 mkdir -p ~/.local/share/cinnamon/extensions ~/.local/share/cinnamon/applets
 cp -r mintywm@leematthewjackson ~/.local/share/cinnamon/extensions/
-cp -r mintywm-status@leematthewjackson ~/.local/share/cinnamon/applets/    # optional
+cp -r mintywm-status@leematthewjackson ~/.local/share/cinnamon/applets/
 ```
 
 The folder names must stay exactly as they are, because Cinnamon matches them to the `uuid` in `metadata.json`.
