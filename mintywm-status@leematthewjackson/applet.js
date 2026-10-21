@@ -13,12 +13,20 @@
 //
 // REQUIRES the MintyWM extension (mintywm@leematthewjackson) to be installed and enabled.
 // Shows tiling on/off for the workspace you are on, and the window count.
-// Click to turn tiling on/off for the current workspace (or to resume it if paused everywhere).
+// Click: pause or resume tiling everywhere. Middle-click: tiling on/off for this workspace.
+// The right-click menu has both, plus "Re-tile now".
 // It only reads global.mintywm, which the extension publishes while it is enabled.
-// It checks once a second, but only touches the panel when something changed.
+// The extension tells it when something changes (no polling). With an older extension
+// that can't do that, it falls back to checking once a second.
 const Applet = imports.ui.applet;
+const PopupMenu = imports.ui.popupMenu;
 const Settings = imports.ui.settings;
 const Mainloop = imports.mainloop;
+
+// The applet and the extension share a set of change callbacks on `global`.
+function isListenerSet(s) {
+    return !!s && typeof s.add === "function" && typeof s.delete === "function" && typeof s[Symbol.iterator] === "function";
+}
 
 class MintyWMStatus extends Applet.TextIconApplet {
     constructor(metadata, orientation, panelHeight, instanceId) {
@@ -36,12 +44,42 @@ class MintyWMStatus extends Applet.TextIconApplet {
         } catch (e) {
             global.logError(e);
         }
+        this._buildMenu();
         this._applyIcon();
+        // The extension calls everything in this set when its state changes. The set is
+        // shared, so it works whichever of the two is loaded first.
+        if (!isListenerSet(global.mintywmListeners)) global.mintywmListeners = new Set();
+        this._listener = () => this._refresh();
+        global.mintywmListeners.add(this._listener);
         this._refresh();
-        this._timer = Mainloop.timeout_add(1000, () => {
+    }
+
+    _buildMenu() {
+        try {
+            const add = (label, fn) => {
+                const item = new PopupMenu.PopupMenuItem(label);
+                item.connect("activate", () => this._call(fn));
+                this._applet_context_menu.addMenuItem(item);
+            };
+            add("Pause or resume tiling everywhere", (api) => api.toggleTiling());
+            add("Tiling on or off for this workspace", (api) => api.toggleWorkspace());
+            add("Re-tile now", (api) => api.retile());
+            this._applet_context_menu.addMenuItem(new PopupMenu.PopupSeparatorMenuItem());
+        } catch (e) {
+            global.logError(e);
+        }
+    }
+
+    // Run an action on the extension, if it is there and new enough to have it.
+    _call(fn) {
+        try {
+            const api = global.mintywm;
+            if (api && typeof api.toggleTiling === "function") fn(api);
+            else if (api && typeof api.toggle === "function") api.toggle();   // older extension
             this._refresh();
-            return true;
-        });
+        } catch (e) {
+            global.logError(e);
+        }
     }
 
     // Symbolic = a single-colour icon that follows the panel theme; colour = the full icon.
@@ -63,27 +101,56 @@ class MintyWMStatus extends Applet.TextIconApplet {
         this.set_applet_icon_symbolic_name("view-grid-symbolic");
     }
 
+    // Everything the panel needs in one go. Older extensions have no state(), so ask
+    // the individual properties instead.
+    _readState(api) {
+        if (typeof api.state === "function") return api.state();
+        return {
+            on: api.on, globalOn: api.globalOn, workspace: api.workspace,
+            excluded: false, tiled: api.tiled, floating: api.floating, overflow: 0,
+        };
+    }
+
+    // Poll only when the extension can't tell us about changes itself.
+    _setPolling(want) {
+        if (want && !this._timer) {
+            this._timer = Mainloop.timeout_add(1000, () => {
+                this._refresh();
+                return true;
+            });
+        } else if (!want && this._timer) {
+            Mainloop.source_remove(this._timer);
+            this._timer = 0;
+        }
+    }
+
     _refresh() {
         try {
             const api = global.mintywm;
+            this._setPolling(!!api && typeof api.state !== "function");
             let label, tip, opacity;
             if (!api) {
                 label = "?";
                 tip = "The MintyWM extension is not enabled";
                 opacity = 90;
-            } else if (api.on) {
-                label = String(api.tiled);
-                const where = api.workspace ? " on workspace " + api.workspace : "";
-                tip = "MintyWM tiling: ON" + where + " (" + api.tiled + " tiled, " + api.floating + " floating). Click to turn off on this workspace.";
-                opacity = 255;
-            } else if (api.globalOn === false) {
-                label = "off";
-                tip = "MintyWM tiling is paused everywhere. Click to turn on.";
-                opacity = 120;
             } else {
-                label = "off";
-                tip = "MintyWM tiling: OFF on workspace " + (api.workspace || "this") + ". Click to turn on here.";
-                opacity = 120;
+                const s = this._readState(api);
+                const ws = s.workspace || "this";
+                if (s.on) {
+                    label = String(s.tiled);
+                    tip = "MintyWM tiling: ON on workspace " + ws + " (" + s.tiled + " tiled, " + s.floating + " floating" +
+                        (s.overflow ? ", " + s.overflow + " didn't fit" : "") + ").";
+                    opacity = 255;
+                } else if (s.globalOn === false) {
+                    label = "off";
+                    tip = "MintyWM tiling is paused everywhere.";
+                    opacity = 120;
+                } else {
+                    label = "off";
+                    tip = "MintyWM tiling: OFF on workspace " + ws + (s.excluded ? " (it is on the excluded list)." : ".");
+                    opacity = 120;
+                }
+                tip += "\nClick: pause or resume tiling everywhere. Middle-click: this workspace only.";
             }
             const show = this.showLabel !== false;
             const key = label + "|" + tip + "|" + opacity + "|" + show;
@@ -99,20 +166,16 @@ class MintyWMStatus extends Applet.TextIconApplet {
     }
 
     on_applet_clicked() {
-        try {
-            const api = global.mintywm;
-            if (api) api.toggle();
-            this._refresh();
-        } catch (e) {
-            global.logError(e);
-        }
+        this._call((api) => api.toggleTiling());
+    }
+
+    on_applet_middle_clicked() {
+        this._call((api) => api.toggleWorkspace());
     }
 
     on_applet_removed_from_panel() {
-        if (this._timer) {
-            Mainloop.source_remove(this._timer);
-            this._timer = 0;
-        }
+        this._setPolling(false);
+        if (isListenerSet(global.mintywmListeners)) global.mintywmListeners.delete(this._listener);
         if (this.settings) {
             try { this.settings.finalize(); } catch (e) {}
         }
