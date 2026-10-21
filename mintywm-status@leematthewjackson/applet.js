@@ -33,13 +33,15 @@ class MintyWMStatus extends Applet.TextIconApplet {
         super(orientation, panelHeight, instanceId);
         this._timer = 0;
         this._shown = "";
-        this.showLabel = true;   // default, in case the settings cannot be loaded
+        // Not "showLabel": that name is a method of the applet base class, and hiding it breaks
+        // hide_applet_label(). The settings key is still "showLabel", so saved choices are kept.
+        this.showCount = true;   // default, in case the settings cannot be loaded
         this.iconStyle = "symbolic";
         this._path = metadata.path || "";
         this._iconShown = "";
         try {
             this.settings = new Settings.AppletSettings(this, metadata.uuid, instanceId);
-            this.settings.bind("showLabel", "showLabel", () => this._refresh());
+            this.settings.bind("showLabel", "showCount", () => this._refresh());
             this.settings.bind("iconStyle", "iconStyle", () => this._applyIcon());
         } catch (e) {
             global.logError(e);
@@ -152,7 +154,7 @@ class MintyWMStatus extends Applet.TextIconApplet {
                 }
                 tip += "\nClick: pause or resume tiling everywhere. Middle-click: this workspace only.";
             }
-            const show = this.showLabel !== false;
+            const show = this.showCount !== false;
             const key = label + "|" + tip + "|" + opacity + "|" + show;
             if (key === this._shown) return;   // identical to what is already on screen
             this._shown = key;

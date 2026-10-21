@@ -5,6 +5,7 @@
     "version": "0.7",
     "author": "Lee Matthew Jackson",
     "website": "https://leematthewjackson.com",
+    "url": "https://github.com/leematthewjackson/MintyWM",
     "max-instances": 1,
     "cinnamon-version": [
         "6.0",
