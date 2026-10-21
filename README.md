@@ -150,7 +150,7 @@ Under **Floating apps** in the settings, each rule has:
 | **Window class** | Matches the window's class or instance name. Case-insensitive, `*` is a wildcard (e.g. `cinnamon-settings*`) |
 | **Title** *(optional)* | Only match windows whose title matches (also wildcarded) |
 
-Defaults: `cinnamon-settings*` and `xlet-settings*`, so Cinnamon's settings and extension/applet configuration windows float.
+Defaults: `cinnamon-settings*` and `xlet-settings*`, so Cinnamon's settings and extension/applet configuration windows float, plus `fontforge*`, `gnome-font-viewer*` and `copyq*` (FontForge, the font viewer and the CopyQ clipboard manager).
 
 **Finding a window's class:** run this in a terminal, then click the window:
 
@@ -201,8 +201,8 @@ Open **System Settings → Extensions → MintyWM → Configure** (the gear icon
 
 | Page | Option | Default |
 |---|---|---|
-| **Tiling** | Inner gap (between windows) | 6 px |
-| | Outer gap (screen edge) | 6 px |
+| **Tiling** | Inner gap (between windows) | 30 px |
+| | Outer gap (screen edge) | 30 px |
 | | Minimum tile width / height | 200 / 120 px |
 | | Resize step (one press of Super+L / Super+H) | 5 % |
 | | Reset tile sizes on every workspace | button |
@@ -211,13 +211,13 @@ Open **System Settings → Extensions → MintyWM → Configure** (the gear icon
 | | Workspaces where tiling is off | none |
 | | Show on-screen notices | on |
 | | Log why windows are or aren't tiled | off |
-| **Floating apps** | Apps that always float | `cinnamon-settings*`, `xlet-settings*` |
+| **Floating apps** | Apps that always float | `cinnamon-settings*`, `xlet-settings*`, `fontforge*`, `gnome-font-viewer*`, `copyq*` |
 | **Borders** | Show borders | on |
 | | Focused colour | `rgb(0,255,204)` (mint) |
 | | Floating colour | `rgb(255,0,255)` (magenta) |
 | | Border width | 2 px |
-| | Corner radius (all corners) | 8 px |
-| | Set each corner separately (top-left, top-right, bottom-left, bottom-right) | off, 8 px each |
+| | Corner radius (all corners, when not set separately) | 8 px |
+| | Set each corner separately (top-left, top-right, bottom-left, bottom-right) | on: 11, 11, 0, 0 px |
 | **Keyboard** | All shortcuts above, including *Tile sizes* | see table |
 | **About** | Credits and links | |
 

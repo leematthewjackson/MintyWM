@@ -171,7 +171,7 @@
     },
     "innerGap": {
         "type": "spinbutton",
-        "default": 6,
+        "default": 30,
         "min": 0,
         "max": 64,
         "step": 1,
@@ -180,7 +180,7 @@
     },
     "outerGap": {
         "type": "spinbutton",
-        "default": 6,
+        "default": 30,
         "min": 0,
         "max": 64,
         "step": 1,
@@ -269,14 +269,14 @@
     },
     "cornerEach": {
         "type": "switch",
-        "default": false,
+        "default": true,
         "description": "Set each corner separately",
         "tooltip": "Useful for themes with rounded top corners and square bottom corners.",
         "dependency": "borders"
     },
     "radiusTopLeft": {
         "type": "spinbutton",
-        "default": 8,
+        "default": 11,
         "min": 0,
         "max": 24,
         "step": 1,
@@ -286,7 +286,7 @@
     },
     "radiusTopRight": {
         "type": "spinbutton",
-        "default": 8,
+        "default": 11,
         "min": 0,
         "max": 24,
         "step": 1,
@@ -296,7 +296,7 @@
     },
     "radiusBottomLeft": {
         "type": "spinbutton",
-        "default": 8,
+        "default": 0,
         "min": 0,
         "max": 24,
         "step": 1,
@@ -306,7 +306,7 @@
     },
     "radiusBottomRight": {
         "type": "spinbutton",
-        "default": 8,
+        "default": 0,
         "min": 0,
         "max": 24,
         "step": 1,
@@ -422,6 +422,21 @@
             {
                 "enabled": true,
                 "wmclass": "xlet-settings*",
+                "title": ""
+            },
+            {
+                "enabled": true,
+                "wmclass": "fontforge*",
+                "title": ""
+            },
+            {
+                "enabled": true,
+                "wmclass": "gnome-font-viewer*",
+                "title": ""
+            },
+            {
+                "enabled": true,
+                "wmclass": "copyq*",
                 "title": ""
             }
         ]

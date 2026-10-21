@@ -25,7 +25,7 @@
 //   - Super+L / Super+H  make the focused tile bigger / smaller (or drag its edge with the mouse);
 //     sizes are kept per workspace. Super+= evens out the workspace you are on
 //   - Floating windows are kept on top of the tiles (switch in the settings), so they don't get lost
-//   - Apps in the "Floating apps" list (Cinnamon's own settings windows by default) open floating
+//   - Apps in the "Floating apps" list (Cinnamon's own settings windows and a few tool windows by default) open floating
 //   - Thin keyline border drawn just outside the window (in the gap; never clickable):
 //       mint  = this window has focus (tiled or floating)
 //       pink  = this window is floating, or did not fit in the layout, and is not focused
@@ -62,8 +62,8 @@ const CONFIG = {
     // monitor 0, the first window takes 60% and the next split is even. Saved in the settings.
     splitRatios: {},
     noTileWorkspaces: "",    // workspace numbers where tiling is off, e.g. "4, 9" or "7-9"
-    innerGap: 6,     // pixels between windows
-    outerGap: 6,     // pixels between windows and screen/panel edges
+    innerGap: 30,    // pixels between windows
+    outerGap: 30,    // pixels between windows and screen/panel edges
     minTileWidth: 200,   // never make a tile smaller than this; extra windows are left alone
     minTileHeight: 120,  // (set both to 0 to tile without limit)
     floatSizePercent: 60,    // size of a window you float when it has no sensible old size
@@ -77,6 +77,9 @@ const CONFIG = {
     floatRules: [
         { enabled: true, wmclass: "cinnamon-settings*", title: "" },   // Cinnamon Settings and its pages
         { enabled: true, wmclass: "xlet-settings*", title: "" },       // applet / extension / desklet settings
+        { enabled: true, wmclass: "fontforge*", title: "" },           // font editor: many small tool windows
+        { enabled: true, wmclass: "gnome-font-viewer*", title: "" },   // font preview
+        { enabled: true, wmclass: "copyq*", title: "" },               // clipboard manager
     ],
     // Borders. Sizes are in px and are multiplied by Cinnamon's UI scale.
     borders: true,
@@ -84,11 +87,11 @@ const CONFIG = {
     floatColor: "rgb(255,0,255)",   // floating window
     borderWidth: 2,
     cornerRadius: 8,         // your theme's window corner radius (the border follows it)
-    cornerEach: false,       // true = use the four values below instead of cornerRadius
-    radiusTopLeft: 8,
-    radiusTopRight: 8,
-    radiusBottomLeft: 8,
-    radiusBottomRight: 8,
+    cornerEach: true,        // true = use the four values below instead of cornerRadius
+    radiusTopLeft: 11,       // rounded top corners, square bottom ones: how most themes draw windows
+    radiusTopRight: 11,
+    radiusBottomLeft: 0,
+    radiusBottomRight: 0,
 };
 
 const HK_TILING = "mintywm-toggle-tiling";
