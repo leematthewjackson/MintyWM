@@ -233,6 +233,8 @@ Open **System Settings → Extensions → MintyWM → Configure** (the gear icon
 
 **Windows look cramped or tiny.** Raise the minimum tile size or lower the gaps. Extra windows are left out of the layout (pink border) once tiles would drop below the minimum.
 
+**A window is drawn in the wrong place** (an empty tile, or an app's content showing in another tile). Some apps, mostly Chromium and Electron ones, sometimes don't redraw after being moved, so their picture stays where it was. MintyWM checks for this after every layout change and fixes it on its own. **Super + Shift + T** forces every window to redraw. `global.mintywm.dump()` marks such windows with `PICTURE STUCK`.
+
 **A window I drag snaps back.** Tiled windows return to their tile when you let go. Float it first (**Super + F**) to move it freely.
 
 ---

@@ -265,6 +265,7 @@ class MintyWM {
         this._settleSince = 0;
         this._afterId = 0;           // the check that runs once the windows have really moved
         this._lookId = 0;
+        this._stuckId = 0;           // the check for window pictures drawn in the wrong place
         this._targets = new Map();   // window -> { x, y, tries }: where the last pass put it
         this._minSize = new Map();   // window -> { w, h }: it refused to be made smaller than this
         this._overflow = new Set();  // eligible windows that did not fit in the last pass
@@ -386,6 +387,7 @@ class MintyWM {
         this._settleSince = 0;
         this._afterId = 0;
         this._lookId = 0;
+        this._stuckId = 0;
         this._lastFocus = null;
         this._changed();   // the applet now shows that the extension is off
     }
@@ -553,6 +555,10 @@ class MintyWM {
         }
         this._minSize.clear();   // measure every window's smallest size again
         this._retile();
+        // Re-send every window's size, even ones already in place: this is what un-sticks
+        // a window whose picture is drawn somewhere else (see _pictureOff).
+        for (const win of this._visibleHere()) this._nudge(win);
+        this._stuckCheck(1);
         this._say("Re-tiled");
     }
 
@@ -948,6 +954,7 @@ class MintyWM {
         const workspace = global.workspace_manager.get_active_workspace();
         if (!this._tilingHere(workspace)) {
             this._refreshBorders();   // nothing to tile here; this just clears the borders
+            this._stuckCheck(0);
             this._changed();
             this._debugLog();
             return;
@@ -977,6 +984,7 @@ class MintyWM {
         this._refreshBorders();
         this._afterPlace(0);   // check positions and borders once the windows have really moved
         if (grew) this._settle();   // a window refused to shrink: lay out again around its real size
+        this._stuckCheck(0);
         this._changed();
         this._debugLog();
     }
@@ -1213,6 +1221,86 @@ class MintyWM {
         }
     }
 
+    // ----- stuck pictures ---------------------------------------------------
+
+    // A window's picture (its actor) should sit exactly on the window. Muffin holds the
+    // picture still while it waits for an app to say it has redrawn at the new size, and
+    // now and then an app (Chromium and Electron apps, mostly) never says so. The window
+    // is then in one place and its picture in another, until the app redraws or Cinnamon
+    // restarts. Returns where the picture is when it is off, otherwise null.
+    _pictureOff(win) {
+        try {
+            const wa = win.get_compositor_private();
+            if (!wa || !wa.visible || win.minimized) return null;
+            const b = win.get_buffer_rect();
+            if (Math.abs(wa.x - b.x) <= 1 && Math.abs(wa.y - b.y) <= 1) return null;
+            return { x: Math.round(wa.x), y: Math.round(wa.y), w: Math.round(wa.width), h: Math.round(wa.height) };
+        } catch (e) {
+            return null;
+        }
+    }
+
+    // The windows we know about that are showing on the workspace you are looking at.
+    _visibleHere() {
+        const ws = global.workspace_manager.get_active_workspace();
+        return this._order.filter((win) => {
+            try {
+                return !win.minimized && (win.is_on_all_workspaces() || win.located_on_workspace(ws));
+            } catch (e) {
+                return false;
+            }
+        });
+    }
+
+    // Make the app redraw: shrink it by a pixel and put it straight back. Each change is
+    // a fresh request the app has to answer, which lets Muffin move the picture again.
+    _nudge(win) {
+        try {
+            if (win.get_maximized() || win.is_fullscreen()) return;
+            const f = win.get_frame_rect();
+            win.move_resize_frame(true, f.x, f.y, Math.max(1, f.width - 1), f.height);
+            win.move_resize_frame(true, f.x, f.y, f.width, f.height);
+        } catch (e) {
+            // window went away
+        }
+    }
+
+    // Last resort: put the picture where the window really is. Muffin takes over again
+    // the next time the app redraws.
+    _snapPicture(win) {
+        try {
+            const wa = win.get_compositor_private();
+            const b = win.get_buffer_rect();
+            if (wa) wa.set_position(b.x, b.y);
+        } catch (e) {
+            // window went away
+        }
+    }
+
+    // Round 0, a second after a layout pass: look for pictures in the wrong place.
+    // Round 1, a moment later: still wrong (so not an animation)? Nudge those windows.
+    // Round 2: still wrong? Move the picture ourselves.
+    _stuckCheck(round) {
+        if (this._stuckId) this._cancel(this._stuckId);
+        this._stuckId = this._later(round === 0 ? 1000 : 400, () => {
+            this._stuckId = 0;
+            const off = this._visibleHere().filter((win) => this._pictureOff(win));
+            if (!off.length) return;
+            if (round === 0) {
+                this._stuckCheck(1);
+                return;
+            }
+            for (const win of off) {
+                const id = this._winIdentity(win) || { cls: "?" };
+                global.log("MintyWM: picture of " + (id.cls || "?") + " is drawn away from the window; " +
+                    (round === 1 ? "asking it to redraw" : "moving the picture"));
+                if (round === 1) this._nudge(win);
+                else this._snapPicture(win);
+            }
+            if (round === 1) this._stuckCheck(2);
+        });
+    }
+
     // ----- diagnostics -----------------------------------------------------
 
     // One line per window saying whether it is tiled and, if not, why.
@@ -1233,6 +1321,8 @@ class MintyWM {
                 line = "  " + (id.cls || id.inst || "?") + " \"" + id.title.slice(0, 40) + "\" " +
                     f.width + "x" + f.height + "+" + f.x + "+" + f.y + " monitor " + win.get_monitor() +
                     (min ? " (refuses below " + min.w + "x" + min.h + ")" : "") + ": " + why;
+                const off = this._pictureOff(win);
+                if (off) line += "  [PICTURE STUCK: drawn at " + off.x + "," + off.y + " " + off.w + "x" + off.h + "]";
             } catch (e) {
                 line = "  (window gone)";
             }
