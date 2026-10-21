@@ -45,6 +45,7 @@ The applet is separate because Cinnamon extensions and applets are installed and
 - **Floating windows stay on top** (optional, on by default), so they don't get lost behind tiled windows.
 - **Per-workspace switch.** Turn tiling off on specific workspaces (say 4 and 9) and keep it everywhere else.
 - **Keyboard navigation.** Cycle focus, swap windows and promote a window to the first slot.
+- **Resizable tiles.** Grow or shrink a tile with the keyboard or by dragging its edge. Sizes are kept per workspace.
 - **Focus and float borders.** A thin luminous border marks the focused window (mint) and floating windows (magenta). Colours, width and corner radius are configurable, with each corner settable separately.
 - **Gaps and minimum sizes.** Inner and outer gaps. When too many windows would make tiles smaller than the minimum, the extras are left out of the layout (with the floating border, so you can see which) instead of becoming unusable slivers. Apps that refuse to shrink below their own minimum size get a bigger tile.
 - **Settings panel built in.** Changes apply live, with no restart.
@@ -122,8 +123,13 @@ All shortcuts can be changed in the extension's settings under **Keyboard**.
 | **Super + Shift + J** | Swap the focused window with the next one |
 | **Super + Shift + K** | Swap the focused window with the previous one |
 | **Super + Shift + H** | Make the focused window the first (largest) tile |
+| **Super + L** | Make the focused tile bigger (the others make room) |
+| **Super + H** | Make the focused tile smaller |
+| **Super + =** | Even tile sizes again on this workspace |
 
 Focus cycling goes round in a loop, and Cinnamon's own Alt+Tab is untouched.
+
+**Resizing tiles.** Press **Super + L** / **Super + H**, or drag the edge of a tile with the mouse (or use Alt+F8). The tiles next to it make room. Sizes are remembered per workspace, also after a restart. **Super + =** evens out the workspace you're on; *Tiling → Window sizes* has a button that resets every workspace, and the applet's right-click menu has *Reset tile sizes on this workspace*. Dragging a tile without changing its size snaps it back into place.
 
 ---
 
@@ -198,6 +204,8 @@ Open **System Settings → Extensions → MintyWM → Configure** (the gear icon
 | **Tiling** | Inner gap (between windows) | 6 px |
 | | Outer gap (screen edge) | 6 px |
 | | Minimum tile width / height | 200 / 120 px |
+| | Resize step (one press of Super+L / Super+H) | 5 % |
+| | Reset tile sizes on every workspace | button |
 | | Size of windows that float | 60 % of the screen |
 | | Keep floating windows on top | on |
 | | Workspaces where tiling is off | none |
@@ -210,7 +218,7 @@ Open **System Settings → Extensions → MintyWM → Configure** (the gear icon
 | | Border width | 2 px |
 | | Corner radius (all corners) | 8 px |
 | | Set each corner separately (top-left, top-right, bottom-left, bottom-right) | off, 8 px each |
-| **Keyboard** | All shortcuts above | see table |
+| **Keyboard** | All shortcuts above, including *Tile sizes* | see table |
 | **About** | Credits and links | |
 
 ---

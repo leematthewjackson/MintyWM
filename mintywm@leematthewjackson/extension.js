@@ -22,6 +22,8 @@
 //   - Super+Shift+H  move the focused window to the first (left) slot
 //   - Super+Alt+T  turns tiling on/off for the workspace you are on (the list is in the settings)
 //   - Super+Shift+F  always float this app (press again to undo); the list is in the settings
+//   - Super+L / Super+H  make the focused tile bigger / smaller (or drag its edge with the mouse);
+//     sizes are kept per workspace. Super+= evens out the workspace you are on
 //   - Floating windows are kept on top of the tiles (switch in the settings), so they don't get lost
 //   - Apps in the "Floating apps" list (Cinnamon's own settings windows by default) open floating
 //   - Thin keyline border drawn just outside the window (in the gap; never clickable):
@@ -52,6 +54,13 @@ const CONFIG = {
     keyMakeFirst: "<Super><Shift>h", // move the focused window to the first (big, left) slot
     keyAlwaysFloat: "<Super><Shift>f", // always float (or stop floating) the focused window's app
     keyToggleWorkspace: "<Super><Alt>t", // turn tiling on/off for the current workspace
+    keyGrow: "<Super>l",           // make the focused tile bigger
+    keyShrink: "<Super>h",         // make the focused tile smaller
+    keyResetSizes: "<Super>equal", // put every tile on this workspace back to even splits
+    resizeStep: 5,     // % of the space a grow/shrink key press moves a divider
+    // Tile sizes you set, per workspace and monitor: { "2:0": [0.6, 0.5] } = on workspace 2,
+    // monitor 0, the first window takes 60% and the next split is even. Saved in the settings.
+    splitRatios: {},
     noTileWorkspaces: "",    // workspace numbers where tiling is off, e.g. "4, 9" or "7-9"
     innerGap: 6,     // pixels between windows
     outerGap: 6,     // pixels between windows and screen/panel edges
@@ -92,6 +101,9 @@ const HK_SWAPP = "mintywm-swap-prev";
 const HK_FIRST = "mintywm-make-first";
 const HK_RULE = "mintywm-always-float";
 const HK_WS = "mintywm-toggle-workspace";
+const HK_GROW = "mintywm-grow";
+const HK_SHRINK = "mintywm-shrink";
+const HK_RESET = "mintywm-reset-sizes";
 
 const NO_MARKS = { focus: false, float: false };
 
@@ -102,13 +114,26 @@ function isListenerSet(s) {
 
 // ---------------------------------------------------------------------------
 // Pure layout code (no GNOME/Muffin imports, so it can be tested with node).
-// Windows are placed in order. Each window takes half of the remaining
-// rectangle; the split runs side-by-side when the rectangle is at least as wide
-// as it is tall, otherwise top-and-bottom. The last window gets what is left.
+// Windows are placed in order. Each window takes a share of the remaining
+// rectangle (half, unless you resized it: see `ratios`); the split runs
+// side-by-side when the rectangle is at least as wide as it is tall, otherwise
+// top-and-bottom. The last window gets what is left.
 // ---------------------------------------------------------------------------
 // --- layout:begin
-function dwindle(area, count, innerGap, outerGap) {
-    if (count <= 0) return [];
+const RATIO_MIN = 0.15;
+const RATIO_MAX = 0.85;
+
+// The share of split i (0 = the first, main split). Missing or odd values mean half.
+function splitRatio(ratios, i) {
+    const r = ratios ? ratios[i] : undefined;
+    if (typeof r !== "number" || !(r > 0 && r < 1)) return 0.5;
+    return Math.min(RATIO_MAX, Math.max(RATIO_MIN, r));
+}
+
+// The full layout: the cells, and for each split the rectangle it divided and which
+// way it ran (horizontal = side by side). The splits are what a resize changes.
+function dwindlePlan(area, count, innerGap, outerGap, ratios) {
+    if (count <= 0) return { cells: [], splits: [] };
     const half = Math.floor(innerGap / 2);
     const inset = outerGap - half;
     let rest = {
@@ -118,16 +143,19 @@ function dwindle(area, count, innerGap, outerGap) {
         height: area.height - 2 * inset,
     };
     const cells = [];
+    const splits = [];
     for (let i = 0; i < count; i++) {
         let cell;
         if (i === count - 1) {
             cell = rest;
         } else if (rest.width >= rest.height) {
-            const w = Math.floor(rest.width / 2);
+            const w = Math.floor(rest.width * splitRatio(ratios, i));
+            splits.push({ rest, horizontal: true });
             cell = { x: rest.x, y: rest.y, width: w, height: rest.height };
             rest = { x: rest.x + w, y: rest.y, width: rest.width - w, height: rest.height };
         } else {
-            const h = Math.floor(rest.height / 2);
+            const h = Math.floor(rest.height * splitRatio(ratios, i));
+            splits.push({ rest, horizontal: false });
             cell = { x: rest.x, y: rest.y, width: rest.width, height: h };
             rest = { x: rest.x, y: rest.y + h, width: rest.width, height: rest.height - h };
         }
@@ -138,16 +166,57 @@ function dwindle(area, count, innerGap, outerGap) {
             height: Math.max(1, cell.height - 2 * half),
         });
     }
-    return cells;
+    return { cells, splits };
+}
+
+function dwindle(area, count, innerGap, outerGap, ratios) {
+    return dwindlePlan(area, count, innerGap, outerGap, ratios).cells;
+}
+
+// Grow (delta > 0) or shrink the window at `index` of `count` tiles. A window grows by
+// moving its own divider; the last window has none, so it moves the one before it the
+// other way. Returns the new ratios, or null when there is nothing to change.
+function resizeSplits(ratios, index, count, delta) {
+    if (count < 2 || index < 0 || index >= count) return null;
+    const k = index < count - 1 ? index : count - 2;
+    const d = index < count - 1 ? delta : -delta;
+    const out = [];
+    for (let i = 0; i < Math.max(k + 1, (ratios || []).length); i++) out.push(splitRatio(ratios, i));
+    const next = Math.round(Math.min(RATIO_MAX, Math.max(RATIO_MIN, out[k] + d)) * 1000) / 1000;
+    if (next === out[k]) return null;
+    out[k] = next;
+    return out;
+}
+
+// A divider dragged to `pos` (x for a side-by-side split, y otherwise): the new share.
+function ratioAt(split, pos) {
+    const r = split.rest;
+    const share = split.horizontal ? (pos - r.x) / r.width : (pos - r.y) / r.height;
+    return Math.round(Math.min(RATIO_MAX, Math.max(RATIO_MIN, share)) * 1000) / 1000;
+}
+
+// Saved sizes are keyed "workspace:monitor" (workspace 1-based). When a workspace is
+// removed, the ones after it are renumbered, like the excluded-workspace list.
+function shiftSplitKeys(obj, removed, count) {
+    if (removed > count) return null;
+    const out = {};
+    for (const key of Object.keys(obj || {})) {
+        const m = /^(\d+):(\d+)$/.exec(key);
+        if (!m) continue;
+        const ws = parseInt(m[1], 10);
+        if (ws === removed) continue;
+        out[(ws > removed && ws <= count + 1 ? ws - 1 : ws) + ":" + m[2]] = obj[key];
+    }
+    return out;
 }
 
 // How many of `count` windows can be tiled before a tile gets smaller than the
 // minimum? Always at least 1 (when there is at least one window).
 // `mins` (optional) holds each window's own smallest size, { w, h } or null, for
-// windows that are known to refuse a smaller tile.
-function fitCount(area, count, innerGap, outerGap, minW, minH, mins) {
+// windows that are known to refuse a smaller tile. `ratios`: see dwindlePlan.
+function fitCount(area, count, innerGap, outerGap, minW, minH, mins, ratios) {
     for (let n = count; n > 1; n--) {
-        const cells = dwindle(area, n, innerGap, outerGap);
+        const cells = dwindle(area, n, innerGap, outerGap, ratios);
         const fits = cells.every((c, i) => {
             const m = (mins && mins[i]) || null;
             return c.width >= Math.max(minW, m ? m.w : 0) &&
@@ -269,6 +338,9 @@ class MintyWM {
         this._targets = new Map();   // window -> { x, y, tries }: where the last pass put it
         this._minSize = new Map();   // window -> { w, h }: it refused to be made smaller than this
         this._overflow = new Set();  // eligible windows that did not fit in the last pass
+        this._splits = {};           // "workspace:monitor" -> [ratio per split]; see CONFIG.splitRatios
+        this._cells = new Map();     // window -> where the last pass put it, and the plan it came from
+        this._splitsSaveId = 0;
         this._borders = new Map();      // window -> { box, parent, sig, style, shown }
         this._lastFocus = null;
         this._settings = null;
@@ -287,6 +359,7 @@ class MintyWM {
         } catch (e) {}
         this._bindSettings();
         this._noTile = parseWorkspaceList(CONFIG.noTileWorkspaces);
+        this._loadSplits();
         this._connect(global.display, "window-created", (display, win) => {
             if (this._consider(win)) this._settle();
         });
@@ -307,7 +380,7 @@ class MintyWM {
         });
         this._connect(global.display, "workareas-changed", () => this._settle(), true);
         this._connect(global.display, "grab-op-begin", () => this._targets.clear(), true);
-        this._connect(global.display, "grab-op-end", () => this._settle(), true);
+        this._connect(global.display, "grab-op-end", (...args) => this._onGrabEnd(args), true);
         this._connect(global.workspace_manager, "workspace-removed",
             (wm, index) => this._onWorkspaceRemoved(index), true);
         this._connect(global.display, "notify::focus-window", () => this._onFocus());
@@ -326,6 +399,7 @@ class MintyWM {
             toggleTiling() { self.toggleTiling(); },
             toggleWorkspace() { self.toggleWorkspace(); },
             retile() { self.retile(); },
+            resetSizes() { self.resetSizes(); },
             // Older applets: un-pause tiling if it is paused everywhere, otherwise flip it
             // for this workspace.
             toggle() { if (!self._tilingOn) self.toggleTiling(); else self.toggleWorkspace(); },
@@ -344,7 +418,7 @@ class MintyWM {
     }
 
     disable() {
-        for (const hk of [HK_TILING, HK_FLOAT, HK_RETILE, HK_NEXT, HK_PREV, HK_SWAPN, HK_SWAPP, HK_FIRST, HK_RULE, HK_WS]) {
+        for (const hk of [HK_TILING, HK_FLOAT, HK_RETILE, HK_NEXT, HK_PREV, HK_SWAPN, HK_SWAPP, HK_FIRST, HK_RULE, HK_WS, HK_GROW, HK_SHRINK, HK_RESET]) {
             try { Main.keybindingManager.removeHotKey(hk); } catch (e) {}
         }
         if (this._settings) {
@@ -383,6 +457,10 @@ class MintyWM {
         this._targets.clear();
         this._minSize.clear();
         this._overflow.clear();
+        this._cells.clear();
+        if (this._splitsSaveId) this._saveSplitsNow();   // don't lose a resize made just now
+        this._splits = {};
+        this._splitsSaveId = 0;
         this._settleId = 0;
         this._settleSince = 0;
         this._afterId = 0;
@@ -398,7 +476,8 @@ class MintyWM {
     // CONFIG. If the settings system is unavailable for any reason, the defaults stay.
     _bindSettings() {
         const KEYS = ["keyToggleTiling", "keyToggleFloat", "keyRetile", "keyFocusNext",
-                      "keyFocusPrev", "keySwapNext", "keySwapPrev", "keyMakeFirst", "keyAlwaysFloat", "keyToggleWorkspace"];
+                      "keyFocusPrev", "keySwapNext", "keySwapPrev", "keyMakeFirst", "keyAlwaysFloat", "keyToggleWorkspace",
+                      "keyGrow", "keyShrink", "keyResetSizes"];
         const LOOK = ["innerGap", "outerGap", "minTileWidth", "minTileHeight", "floatSizePercent", "floatOnTop",
                       "borders", "focusColor", "floatColor", "borderWidth", "cornerRadius",
                       "cornerEach", "radiusTopLeft", "radiusTopRight", "radiusBottomLeft", "radiusBottomRight"];
@@ -408,6 +487,8 @@ class MintyWM {
             for (const k of KEYS) this._settings.bindProperty(dir, k, k, () => this._bindKeys(), null);
             for (const k of LOOK) this._settings.bindProperty(dir, k, k, () => this._onLookChanged(), null);
             this._settings.bindProperty(dir, "notify", "notify", null, null);
+            this._settings.bindProperty(dir, "resizeStep", "resizeStep", null, null);
+            this._settings.bindProperty(dir, "splitRatios", "splitRatios", () => { this._loadSplits(); this._settle(); }, null);
             this._settings.bindProperty(dir, "debug", "debug", () => { this._lastDump = ""; this._debugLog(); }, null);
             this._settings.bindProperty(dir, "floatRules", "floatRules", () => this._reapplyRules(), null);
             this._settings.bindProperty(dir, "noTileWorkspaces", "noTileWorkspaces", () => this._onWorkspacesChanged(), null);
@@ -429,6 +510,9 @@ class MintyWM {
             [HK_FIRST, "keyMakeFirst", () => this.makeFirst()],
             [HK_RULE, "keyAlwaysFloat", () => this.alwaysFloat()],
             [HK_WS, "keyToggleWorkspace", () => this.toggleWorkspace()],
+            [HK_GROW, "keyGrow", () => this.resizeFocused(1)],
+            [HK_SHRINK, "keyShrink", () => this.resizeFocused(-1)],
+            [HK_RESET, "keyResetSizes", () => this.resetSizes()],
         ];
         for (const [name, key, fn] of table) {
             try { Main.keybindingManager.removeHotKey(name); } catch (e) {}
@@ -518,11 +602,18 @@ class MintyWM {
 
     // A workspace was deleted: the ones after it are renumbered, so the list follows them.
     _onWorkspaceRemoved(index) {
-        if (typeof index !== "number" || !this._noTile.size) return;
-        const next = shiftWorkspaceList(this._noTile, index + 1, global.workspace_manager.get_n_workspaces());
-        if (!next) return;
-        this._saveNoTile(next);
-        this._settle();
+        if (typeof index !== "number") return;
+        const count = global.workspace_manager.get_n_workspaces();
+        let changed = false;
+        if (this._noTile.size) {
+            const next = shiftWorkspaceList(this._noTile, index + 1, count);
+            if (next) { this._saveNoTile(next); changed = true; }
+        }
+        if (Object.keys(this._splits).length) {
+            const next = shiftSplitKeys(this._splits, index + 1, count);
+            if (next) { this._splits = next; this._saveSplitsNow(); changed = true; }
+        }
+        if (changed) this._settle();
     }
 
     // Super+Alt+T: tiling on/off for the workspace you are on. The list in the settings follows.
@@ -661,6 +752,124 @@ class MintyWM {
         } catch (e) {
             global.logError(e);
         }
+    }
+
+    // ----- tile sizes -------------------------------------------------------
+
+    // Take the saved sizes from the settings, keeping only well-formed entries.
+    _loadSplits() {
+        const src = CONFIG.splitRatios;
+        const out = {};
+        if (src && typeof src === "object") {
+            for (const key of Object.keys(src)) {
+                if (/^\d+:\d+$/.test(key) && Array.isArray(src[key])) {
+                    out[key] = src[key].map((r, i) => splitRatio(src[key], i));
+                }
+            }
+        }
+        this._splits = out;
+    }
+
+    _ratiosFor(key) {
+        const r = this._splits[key];
+        return Array.isArray(r) ? r.slice() : [];
+    }
+
+    // Store new sizes for one workspace/monitor. Even splits are simply forgotten.
+    _setRatios(key, ratios) {
+        if (!ratios || ratios.every((r) => r === 0.5)) delete this._splits[key];
+        else this._splits[key] = ratios;
+        // A key held down gives a burst of changes: write the settings file once, after it.
+        if (this._splitsSaveId) this._cancel(this._splitsSaveId);
+        this._splitsSaveId = this._later(500, () => this._saveSplitsNow());
+    }
+
+    _saveSplitsNow() {
+        if (this._splitsSaveId) this._cancel(this._splitsSaveId);
+        this._splitsSaveId = 0;
+        CONFIG.splitRatios = JSON.parse(JSON.stringify(this._splits));
+        if (this._settings) {
+            try { this._settings.setValue("splitRatios", CONFIG.splitRatios); } catch (e) { global.logError(e); }
+        }
+    }
+
+    // Super+L / Super+H: make the focused tile bigger (+1) or smaller (-1). Its divider
+    // moves; the other tiles on the workspace make room. Nothing happens if a tile would
+    // end up smaller than the minimum tile size.
+    resizeFocused(dir) {
+        const win = global.display.focus_window;
+        const p = win ? this._cells.get(win) : null;
+        if (!p || p.count < 2) return;
+        const step = Math.max(1, Math.min(25, Number(CONFIG.resizeStep) || 5)) / 100;
+        const next = resizeSplits(p.ratios, p.index, p.count, dir * step);
+        if (!next || !this._fits(p, next)) return;
+        this._setRatios(p.key, next);
+        this._retile();
+    }
+
+    // Would every tile in this plan still be at least the minimum size with these ratios?
+    _fits(p, ratios) {
+        return dwindle(p.area, p.count, CONFIG.innerGap, CONFIG.outerGap, ratios).every((c) =>
+            c.width >= CONFIG.minTileWidth && c.height >= CONFIG.minTileHeight);
+    }
+
+    // Super+=: even splits again on the workspace you are on (every monitor).
+    resetSizes() {
+        const prefix = this._workspaceNumber() + ":";
+        let any = false;
+        for (const key of Object.keys(this._splits)) {
+            if (key.startsWith(prefix)) { delete this._splits[key]; any = true; }
+        }
+        if (any) this._saveSplitsNow();
+        this._retile();
+        this._say("Window sizes reset on workspace " + this._workspaceNumber());
+    }
+
+    // The settings page button: even splits everywhere.
+    resetAllSizes() {
+        this._splits = {};
+        this._saveSplitsNow();
+        this._retile();
+        this._say("Window sizes reset on every workspace");
+    }
+
+    // A mouse drag (or Alt+F8) ended. If it resized a tile, move the divider it dragged so
+    // the layout keeps that size; a plain move just snaps back into place.
+    _onGrabEnd(args) {
+        let win = null;
+        for (const a of args) {
+            if (a && typeof a.get_frame_rect === "function" && typeof a.get_wm_class === "function") { win = a; break; }
+        }
+        if (!win) win = global.display.focus_window;
+        if (win) this._learnResize(win);
+        this._settle();
+    }
+
+    _learnResize(win) {
+        const p = this._cells.get(win);
+        if (!p || p.count < 2 || this._floating.has(win)) return;
+        let f;
+        try { f = win.get_frame_rect(); } catch (e) { return; }
+        const c = p.cell;
+        if (Math.abs(f.width - c.width) <= 2 && Math.abs(f.height - c.height) <= 2) return;   // moved, not resized
+        const half = Math.floor(CONFIG.innerGap / 2);
+        // Each edge of a tile is a divider: right/bottom = its own split, left/top = the
+        // split before it. Take the edge that moved furthest, if it is a real divider.
+        const edges = [
+            { k: p.index, horizontal: true, moved: (f.x + f.width) - (c.x + c.width), pos: f.x + f.width + half },
+            { k: p.index, horizontal: false, moved: (f.y + f.height) - (c.y + c.height), pos: f.y + f.height + half },
+            { k: p.index - 1, horizontal: true, moved: f.x - c.x, pos: f.x - half },
+            { k: p.index - 1, horizontal: false, moved: f.y - c.y, pos: f.y - half },
+        ].filter((e) => e.k >= 0 && e.k < p.splits.length && p.splits[e.k].horizontal === e.horizontal &&
+            Math.abs(e.moved) > 2)
+         .sort((a, b) => Math.abs(b.moved) - Math.abs(a.moved));
+        if (!edges.length) return;
+        const e = edges[0];
+        const next = [];
+        for (let i = 0; i < Math.max(e.k + 1, p.ratios.length); i++) next.push(splitRatio(p.ratios, i));
+        next[e.k] = ratioAt(p.splits[e.k], e.pos);
+        if (!this._fits(p, next)) return;   // too small for the minimum tile size: snap back
+        this._setRatios(p.key, next);
     }
 
     // ----- floating windows on top -----------------------------------------
@@ -848,6 +1057,7 @@ class MintyWM {
         this._targets.delete(win);
         this._minSize.delete(win);
         this._overflow.delete(win);
+        this._cells.delete(win);
         this._winConns.delete(win);  // window is being destroyed; nothing to disconnect
         this._dropBorder(win);
         if (this._lastFocus === win) this._lastFocus = null;
@@ -949,6 +1159,7 @@ class MintyWM {
     _retile() {
         this._targets.clear();   // checks still pending from an earlier pass are out of date
         this._overflow.clear();
+        this._cells.clear();
         for (const win of this._order) this._applyRule(win);
         this._syncAbove();
         const workspace = global.workspace_manager.get_active_workspace();
@@ -972,12 +1183,15 @@ class MintyWM {
             try { area = this._workArea(workspace, mon, wins[0]); } catch (e) { continue; }
             // Too many windows for the screen: tile the first n, leave the rest alone
             // (they get the floating border so it is clear they are not in the layout).
+            const key = (workspace.index() + 1) + ":" + mon;
+            const ratios = this._ratiosFor(key);
             const mins = wins.map((w) => this._minSize.get(w) || null);
             const n = fitCount(area, wins.length, CONFIG.innerGap, CONFIG.outerGap,
-                               CONFIG.minTileWidth, CONFIG.minTileHeight, mins);
-            const cells = dwindle(area, n, CONFIG.innerGap, CONFIG.outerGap);
+                               CONFIG.minTileWidth, CONFIG.minTileHeight, mins, ratios);
+            const plan = dwindlePlan(area, n, CONFIG.innerGap, CONFIG.outerGap, ratios);
             for (let i = 0; i < n; i++) {
-                if (this._place(wins[i], cells[i])) grew = true;
+                this._cells.set(wins[i], { index: i, count: n, cell: plan.cells[i], splits: plan.splits, ratios, key, area });
+                if (this._place(wins[i], plan.cells[i])) grew = true;
             }
             for (let i = n; i < wins.length; i++) this._overflow.add(wins[i]);
         }
@@ -1309,7 +1523,9 @@ class MintyWM {
         const n = ws.index() + 1;
         const lines = ["MintyWM: tiling " + (this._tilingOn ? "on" : "paused everywhere") +
             "; workspace " + n + (this._noTile.has(n) ? " is excluded" : "") +
-            "; excluded list: [" + formatWorkspaceList(this._noTile) + "]"];
+            "; excluded list: [" + formatWorkspaceList(this._noTile) + "]" +
+            "; sizes: " + JSON.stringify(Object.keys(this._splits).filter((k) => k.startsWith(n + ":"))
+                .reduce((o, k) => { o[k] = this._splits[k]; return o; }, {}))];
         for (const win of this._order) {
             let line;
             try {
@@ -1407,6 +1623,12 @@ function enable() {
     app = new MintyWM();
     app.enable();
 }
+
+// The "Reset all window sizes" button in the settings calls this.
+function resetSizes() {
+    if (app) app.resetAllSizes();
+}
+CONFIG.resetSizes = resetSizes;
 
 function disable() {
     if (app) {

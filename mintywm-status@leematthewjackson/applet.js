@@ -14,7 +14,7 @@
 // REQUIRES the MintyWM extension (mintywm@leematthewjackson) to be installed and enabled.
 // Shows tiling on/off for the workspace you are on, and the window count.
 // Click: pause or resume tiling everywhere. Middle-click: tiling on/off for this workspace.
-// The right-click menu has both, plus "Re-tile now".
+// The right-click menu has both, plus "Re-tile now" and "Reset tile sizes".
 // It only reads global.mintywm, which the extension publishes while it is enabled.
 // The extension tells it when something changes (no polling). With an older extension
 // that can't do that, it falls back to checking once a second.
@@ -66,6 +66,7 @@ class MintyWMStatus extends Applet.TextIconApplet {
             add("Pause or resume tiling everywhere", (api) => api.toggleTiling());
             add("Tiling on or off for this workspace", (api) => api.toggleWorkspace());
             add("Re-tile now", (api) => api.retile());
+            add("Reset tile sizes on this workspace", (api) => { if (api.resetSizes) api.resetSizes(); });
             this._applet_context_menu.addMenuItem(new PopupMenu.PopupSeparatorMenuItem());
         } catch (e) {
             global.logError(e);

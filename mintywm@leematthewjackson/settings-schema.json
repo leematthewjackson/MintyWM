@@ -39,7 +39,8 @@
             "title": "Keyboard",
             "sections": [
                 "sec-keys-modes",
-                "sec-keys-focus"
+                "sec-keys-focus",
+                "sec-keys-resize"
             ]
         },
         "page-about": {
@@ -63,7 +64,10 @@
             "keys": [
                 "minTileWidth",
                 "minTileHeight",
-                "floatSizePercent"
+                "floatSizePercent",
+                "resizeHelp",
+                "resizeStep",
+                "resetSizesButton"
             ]
         },
         "sec-floatwin": {
@@ -153,6 +157,15 @@
             "title": "Apps that open floating",
             "keys": [
                 "floatRules"
+            ]
+        },
+        "sec-keys-resize": {
+            "type": "section",
+            "title": "Tile sizes",
+            "keys": [
+                "keyGrow",
+                "keyShrink",
+                "keyResetSizes"
             ]
         }
     },
@@ -438,5 +451,43 @@
         "type": "keybinding",
         "default": "<Super><Alt>t",
         "description": "Turn tiling on or off for this workspace"
+    },
+    "keyGrow": {
+        "type": "keybinding",
+        "default": "<Super>l",
+        "description": "Make the focused tile bigger"
+    },
+    "keyShrink": {
+        "type": "keybinding",
+        "default": "<Super>h",
+        "description": "Make the focused tile smaller"
+    },
+    "keyResetSizes": {
+        "type": "keybinding",
+        "default": "<Super>equal",
+        "description": "Even tile sizes again on this workspace"
+    },
+    "resizeHelp": {
+        "type": "label",
+        "description": "Resize a tile with Super+L / Super+H, or drag its edge with the mouse. The other tiles make room. Sizes are kept per workspace."
+    },
+    "resizeStep": {
+        "type": "spinbutton",
+        "default": 5,
+        "min": 1,
+        "max": 25,
+        "step": 1,
+        "units": "%",
+        "description": "Resize step",
+        "tooltip": "How far one press of the grow or shrink key moves a tile's edge."
+    },
+    "resetSizesButton": {
+        "type": "button",
+        "description": "Reset tile sizes on every workspace",
+        "callback": "resetSizes"
+    },
+    "splitRatios": {
+        "type": "generic",
+        "default": {}
     }
 }

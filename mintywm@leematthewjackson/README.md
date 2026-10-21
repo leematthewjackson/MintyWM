@@ -24,6 +24,8 @@ needs this extension.
 | Super+Shift+J / K | swap with next / previous tile |
 | Super+Shift+H | move to the first (left) slot |
 | Super+Shift+F | always float this app (press again to undo) |
+| Super+L / Super+H | make the focused tile bigger / smaller (or drag its edge) |
+| Super+= | even tile sizes again on this workspace |
 
 ## Floating apps
 
