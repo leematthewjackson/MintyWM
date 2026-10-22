@@ -39,7 +39,8 @@
             "title": "Keyboard",
             "sections": [
                 "sec-keys-modes",
-                "sec-keys-focus"
+                "sec-keys-focus",
+                "sec-keys-resize"
             ]
         },
         "page-about": {
@@ -63,7 +64,10 @@
             "keys": [
                 "minTileWidth",
                 "minTileHeight",
-                "floatSizePercent"
+                "floatSizePercent",
+                "resizeHelp",
+                "resizeStep",
+                "resetSizesButton"
             ]
         },
         "sec-floatwin": {
@@ -85,7 +89,8 @@
             "type": "section",
             "title": "Feedback",
             "keys": [
-                "notify"
+                "notify",
+                "debug"
             ]
         },
         "sec-borders": {
@@ -96,7 +101,12 @@
                 "focusColor",
                 "floatColor",
                 "borderWidth",
-                "cornerRadius"
+                "cornerRadius",
+                "cornerEach",
+                "radiusTopLeft",
+                "radiusTopRight",
+                "radiusBottomLeft",
+                "radiusBottomRight"
             ]
         },
         "sec-keys-modes": {
@@ -148,11 +158,20 @@
             "keys": [
                 "floatRules"
             ]
+        },
+        "sec-keys-resize": {
+            "type": "section",
+            "title": "Tile sizes",
+            "keys": [
+                "keyGrow",
+                "keyShrink",
+                "keyResetSizes"
+            ]
         }
     },
     "innerGap": {
         "type": "spinbutton",
-        "default": 6,
+        "default": 30,
         "min": 0,
         "max": 64,
         "step": 1,
@@ -161,7 +180,7 @@
     },
     "outerGap": {
         "type": "spinbutton",
-        "default": 6,
+        "default": 30,
         "min": 0,
         "max": 64,
         "step": 1,
@@ -204,6 +223,12 @@
         "default": true,
         "description": "Show a notification when tiling or floating is toggled"
     },
+    "debug": {
+        "type": "switch",
+        "default": false,
+        "description": "Log why windows are or aren't tiled (for bug reports)",
+        "tooltip": "Writes a line per window to the Cinnamon log after each layout change. You can also run global.mintywm.dump() in Looking Glass (Alt+F2, lg) at any time."
+    },
     "borders": {
         "type": "switch",
         "default": true,
@@ -238,9 +263,56 @@
         "max": 24,
         "step": 1,
         "units": "px",
-        "description": "Window corner radius",
-        "tooltip": "Match your theme's window corners so the border hugs them.",
+        "description": "Window corner radius (all corners)",
+        "tooltip": "Match your theme's window corners so the border hugs them. 0 gives square corners.",
+        "dependency": "!cornerEach"
+    },
+    "cornerEach": {
+        "type": "switch",
+        "default": true,
+        "description": "Set each corner separately",
+        "tooltip": "Useful for themes with rounded top corners and square bottom corners.",
         "dependency": "borders"
+    },
+    "radiusTopLeft": {
+        "type": "spinbutton",
+        "default": 11,
+        "min": 0,
+        "max": 24,
+        "step": 1,
+        "units": "px",
+        "description": "Top-left corner radius",
+        "dependency": "cornerEach"
+    },
+    "radiusTopRight": {
+        "type": "spinbutton",
+        "default": 11,
+        "min": 0,
+        "max": 24,
+        "step": 1,
+        "units": "px",
+        "description": "Top-right corner radius",
+        "dependency": "cornerEach"
+    },
+    "radiusBottomLeft": {
+        "type": "spinbutton",
+        "default": 0,
+        "min": 0,
+        "max": 24,
+        "step": 1,
+        "units": "px",
+        "description": "Bottom-left corner radius",
+        "dependency": "cornerEach"
+    },
+    "radiusBottomRight": {
+        "type": "spinbutton",
+        "default": 0,
+        "min": 0,
+        "max": 24,
+        "step": 1,
+        "units": "px",
+        "description": "Bottom-right corner radius",
+        "dependency": "cornerEach"
     },
     "keyToggleTiling": {
         "type": "keybinding",
@@ -351,6 +423,21 @@
                 "enabled": true,
                 "wmclass": "xlet-settings*",
                 "title": ""
+            },
+            {
+                "enabled": true,
+                "wmclass": "fontforge*",
+                "title": ""
+            },
+            {
+                "enabled": true,
+                "wmclass": "gnome-font-viewer*",
+                "title": ""
+            },
+            {
+                "enabled": true,
+                "wmclass": "copyq*",
+                "title": ""
             }
         ]
     },
@@ -379,5 +466,43 @@
         "type": "keybinding",
         "default": "<Super><Alt>t",
         "description": "Turn tiling on or off for this workspace"
+    },
+    "keyGrow": {
+        "type": "keybinding",
+        "default": "<Super>l",
+        "description": "Make the focused tile bigger"
+    },
+    "keyShrink": {
+        "type": "keybinding",
+        "default": "<Super>h",
+        "description": "Make the focused tile smaller"
+    },
+    "keyResetSizes": {
+        "type": "keybinding",
+        "default": "<Super>equal",
+        "description": "Even tile sizes again on this workspace"
+    },
+    "resizeHelp": {
+        "type": "label",
+        "description": "Resize a tile with Super+L / Super+H, or drag its edge with the mouse. The other tiles make room. Sizes are kept per workspace."
+    },
+    "resizeStep": {
+        "type": "spinbutton",
+        "default": 5,
+        "min": 1,
+        "max": 25,
+        "step": 1,
+        "units": "%",
+        "description": "Resize step",
+        "tooltip": "How far one press of the grow or shrink key moves a tile's edge."
+    },
+    "resetSizesButton": {
+        "type": "button",
+        "description": "Reset tile sizes on every workspace",
+        "callback": "resetSizes"
+    },
+    "splitRatios": {
+        "type": "generic",
+        "default": {}
     }
 }

@@ -29,8 +29,8 @@ Look at my "rice" :D
 
 | Folder | What it is | Version |
 |---|---|---|
-| `mintywm@leematthewjackson/` | **The extension.** This is MintyWM itself, with its own settings panel. | 0.8 |
-| `mintywm-status@leematthewjackson/` | **Optional panel applet.** Shows tiling status and the window count. It is separate and not bundled. It **requires the extension** and does nothing without it. | 0.6 |
+| `mintywm@leematthewjackson/` | **The extension.** This is MintyWM itself, with its own settings panel. | 0.9 |
+| `mintywm-status@leematthewjackson/` | **Optional panel applet.** Shows tiling status and the window count. It is separate and not bundled. It **requires the extension** and does nothing without it. | 0.7 |
 
 The applet is separate because Cinnamon extensions and applets are installed and enabled independently.
 
@@ -45,10 +45,11 @@ The applet is separate because Cinnamon extensions and applets are installed and
 - **Floating windows stay on top** (optional, on by default), so they don't get lost behind tiled windows.
 - **Per-workspace switch.** Turn tiling off on specific workspaces (say 4 and 9) and keep it everywhere else.
 - **Keyboard navigation.** Cycle focus, swap windows and promote a window to the first slot.
-- **Focus and float borders.** A thin luminous border marks the focused window (mint) and floating windows (magenta). Colours, width and corner radius are configurable.
-- **Gaps and minimum sizes.** Inner and outer gaps. When too many windows would make tiles smaller than the minimum, the extras float instead of becoming unusable slivers.
+- **Resizable tiles.** Grow or shrink a tile with the keyboard or by dragging its edge. Sizes are kept per workspace.
+- **Focus and float borders.** A thin luminous border marks the focused window (mint) and floating windows (magenta). Colours, width and corner radius are configurable, with each corner settable separately.
+- **Gaps and minimum sizes.** Inner and outer gaps. When too many windows would make tiles smaller than the minimum, the extras are left out of the layout (with the floating border, so you can see which) instead of becoming unusable slivers. Apps that refuse to shrink below their own minimum size get a bigger tile.
 - **Settings panel built in.** Changes apply live, with no restart.
-- **Status applet** (optional). Shows *on / off* and the number of tiled windows, and toggles tiling on click.
+- **Status applet** (optional). Shows *on / off* and the number of tiled windows. Click to pause or resume tiling, middle-click for the current workspace only.
 
 ---
 
@@ -67,8 +68,8 @@ If the two zip files are in `~/Downloads`:
 
 ```bash
 mkdir -p ~/.local/share/cinnamon/extensions ~/.local/share/cinnamon/applets
-unzip -oq ~/Downloads/mintywm-extension-0.8.zip -d ~/.local/share/cinnamon/extensions/
-unzip -oq ~/Downloads/mintywm-status-applet-0.6.zip -d ~/.local/share/cinnamon/applets/
+unzip -oq ~/Downloads/mintywm-extension-0.9.zip -d ~/.local/share/cinnamon/extensions/
+unzip -oq ~/Downloads/mintywm-status-applet-0.7.zip -d ~/.local/share/cinnamon/applets/
 ```
 
 ### From this repository
@@ -122,8 +123,13 @@ All shortcuts can be changed in the extension's settings under **Keyboard**.
 | **Super + Shift + J** | Swap the focused window with the next one |
 | **Super + Shift + K** | Swap the focused window with the previous one |
 | **Super + Shift + H** | Make the focused window the first (largest) tile |
+| **Super + L** | Make the focused tile bigger (the others make room) |
+| **Super + H** | Make the focused tile smaller |
+| **Super + =** | Even tile sizes again on this workspace |
 
 Focus cycling goes round in a loop, and Cinnamon's own Alt+Tab is untouched.
+
+**Resizing tiles.** Press **Super + L** / **Super + H**, or drag the edge of a tile with the mouse (or use Alt+F8). The tiles next to it make room. Sizes are remembered per workspace, also after a restart. **Super + =** evens out the workspace you're on; *Tiling → Window sizes* has a button that resets every workspace, and the applet's right-click menu has *Reset tile sizes on this workspace*. Dragging a tile without changing its size snaps it back into place.
 
 ---
 
@@ -144,7 +150,7 @@ Under **Floating apps** in the settings, each rule has:
 | **Window class** | Matches the window's class or instance name. Case-insensitive, `*` is a wildcard (e.g. `cinnamon-settings*`) |
 | **Title** *(optional)* | Only match windows whose title matches (also wildcarded) |
 
-Defaults: `cinnamon-settings*` and `xlet-settings*`, so Cinnamon's settings and extension/applet configuration windows float.
+Defaults: `cinnamon-settings*` and `xlet-settings*`, so Cinnamon's settings and extension/applet configuration windows float, plus `fontforge*`, `gnome-font-viewer*` and `copyq*` (FontForge, the font viewer and the CopyQ clipboard manager).
 
 **Finding a window's class:** run this in a terminal, then click the window:
 
@@ -180,7 +186,7 @@ On a workspace where tiling is off, MintyWM does not move, resize, border or pin
 | `off` (dimmed) | Tiling is off here, or paused everywhere |
 | `?` | The MintyWM extension isn't enabled |
 
-**Click it** to turn tiling on or off for the current workspace (or to resume tiling if it is paused everywhere). The tooltip says which state you're in and which workspace.
+**Click it** to pause or resume tiling everywhere. **Middle-click** turns tiling on or off for the current workspace only. The right-click menu has both, plus **Re-tile now**. The tooltip says which state you're in, which workspace, and whether that workspace is on the excluded list.
 
 Applet settings: show or hide the count label, and choose a **symbolic** icon (matches your panel theme, the default) or the **full-colour** icon.
 
@@ -195,20 +201,24 @@ Open **System Settings → Extensions → MintyWM → Configure** (the gear icon
 
 | Page | Option | Default |
 |---|---|---|
-| **Tiling** | Inner gap (between windows) | 6 px |
-| | Outer gap (screen edge) | 6 px |
+| **Tiling** | Inner gap (between windows) | 30 px |
+| | Outer gap (screen edge) | 30 px |
 | | Minimum tile width / height | 200 / 120 px |
+| | Resize step (one press of Super+L / Super+H) | 5 % |
+| | Reset tile sizes on every workspace | button |
 | | Size of windows that float | 60 % of the screen |
 | | Keep floating windows on top | on |
 | | Workspaces where tiling is off | none |
 | | Show on-screen notices | on |
-| **Floating apps** | Apps that always float | `cinnamon-settings*`, `xlet-settings*` |
+| | Log why windows are or aren't tiled | off |
+| **Floating apps** | Apps that always float | `cinnamon-settings*`, `xlet-settings*`, `fontforge*`, `gnome-font-viewer*`, `copyq*` |
 | **Borders** | Show borders | on |
 | | Focused colour | `rgb(0,255,204)` (mint) |
 | | Floating colour | `rgb(255,0,255)` (magenta) |
 | | Border width | 2 px |
-| | Corner radius | 8 px |
-| **Keyboard** | All shortcuts above | see table |
+| | Corner radius (all corners, when not set separately) | 8 px |
+| | Set each corner separately (top-left, top-right, bottom-left, bottom-right) | on: 11, 11, 0, 0 px |
+| **Keyboard** | All shortcuts above, including *Tile sizes* | see table |
 | **About** | Credits and links | |
 
 ---
@@ -219,13 +229,21 @@ Open **System Settings → Extensions → MintyWM → Configure** (the gear icon
 
 **One app won't tile.** It may be on the *Floating apps* list, or tiling may be off on that workspace. Try **Super + Shift + T**.
 
+**Nothing tiles, even after Super + T.** That workspace is probably on the excluded list (Super + T then says so). Press **Super + Alt + T** or **Super + Shift + T**, or clear it under *Tiling → Workspaces*.
+
+**Why isn't this window tiled?** Open **Looking Glass** (Alt+F2, `lg`) and run `global.mintywm.dump()`. It lists every window and why it is or isn't tiled (minimised, floating, invisible, didn't fit, and so on). For a bug report, turn on *Log why windows are or aren't tiled* under *Tiling → Feedback* and include the log.
+
 **A window refuses to be placed.** MintyWM retries a few times because some apps, such as terminals, resize in steps. If an app keeps ignoring it, add it to the Floating apps list.
 
 **The applet shows `?`.** The extension isn't running. Enable MintyWM under *Extensions*.
 
 **A shortcut clashes with something.** Change it under *Keyboard* in the settings.
 
-**Windows look cramped or tiny.** Raise the minimum tile size or lower the gaps. Extra windows float once tiles would drop below the minimum.
+**Windows look cramped or tiny.** Raise the minimum tile size or lower the gaps. Extra windows are left out of the layout (pink border) once tiles would drop below the minimum.
+
+**A window is drawn in the wrong place** (an empty tile, or an app's content showing in another tile). Some apps, mostly Chromium and Electron ones, sometimes don't redraw after being moved, so their picture stays where it was. MintyWM checks for this after every layout change and fixes it on its own. **Super + Shift + T** forces every window to redraw. `global.mintywm.dump()` marks such windows with `PICTURE STUCK`.
+
+**A window I drag snaps back.** Tiled windows return to their tile when you let go. Float it first (**Super + F**) to move it freely.
 
 ---
 

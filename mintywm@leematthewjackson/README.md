@@ -24,6 +24,8 @@ needs this extension.
 | Super+Shift+J / K | swap with next / previous tile |
 | Super+Shift+H | move to the first (left) slot |
 | Super+Shift+F | always float this app (press again to undo) |
+| Super+L / Super+H | make the focused tile bigger / smaller (or drag its edge) |
+| Super+= | even tile sizes again on this workspace |
 
 ## Floating apps
 
@@ -42,3 +44,8 @@ Manage the list in the settings, on the **Floating apps** page.
 
 To keep some workspaces untiled, list their numbers in the settings (Tiling > Workspaces), for example
 `4, 9` or `7-9`. **Super+Alt+T** flips the workspace you are on and keeps that list up to date.
+
+## Something not tiling?
+
+Open Looking Glass (Alt+F2, `lg`) and run `global.mintywm.dump()`. It lists every window and why it is
+or isn't tiled. If a whole workspace never tiles, it is probably on the excluded list: press **Super+Alt+T**.
