@@ -4,26 +4,16 @@
 // Copyright (C) 2026 Lee Matthew Jackson
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
-// This program is free software: you can redistribute it and/or modify it under
-// the terms of the GNU General Public License as published by the Free Software
-// Foundation, either version 3 of the License, or (at your option) any later version.
-// It is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY;
-// without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR
-// PURPOSE. See the GNU General Public License (the LICENSE file) for details.
-//
-// REQUIRES the MintyWM extension (mintywm@leematthewjackson) to be installed and enabled.
-// Shows tiling on/off for the workspace you are on, and the window count.
-// Click: pause or resume tiling everywhere. Middle-click: tiling on/off for this workspace.
-// The right-click menu has both, plus "Re-tile now" and "Reset tile sizes".
-// It only reads global.mintywm, which the extension publishes while it is enabled.
-// The extension tells it when something changes (no polling). With an older extension
-// that can't do that, it falls back to checking once a second.
+// REQUIRES the MintyWM extension (mintywm@leematthewjackson).
+// Left-click opens the status menu (state, overflow, actions, live keys).
+// Middle-click toggles tiling for this workspace only.
+// The icon changes: tiles = on, pause bars = paused everywhere, a dash = off on this workspace.
+// A count like 3+1 means three tiled windows and one that did not fit (parked on screen).
 const Applet = imports.ui.applet;
 const PopupMenu = imports.ui.popupMenu;
 const Settings = imports.ui.settings;
 const Mainloop = imports.mainloop;
 
-// The applet and the extension share a set of change callbacks on `global`.
 function isListenerSet(s) {
     return !!s && typeof s.add === "function" && typeof s.delete === "function" && typeof s[Symbol.iterator] === "function";
 }
@@ -33,30 +23,28 @@ class MintyWMStatus extends Applet.TextIconApplet {
         super(orientation, panelHeight, instanceId);
         this._timer = 0;
         this._shown = "";
-        // Not "showLabel": that name is a method of the applet base class, and hiding it breaks
-        // hide_applet_label(). The settings key is still "showLabel", so saved choices are kept.
-        this.showCount = true;   // default, in case the settings cannot be loaded
+        this.showCount = true;
         this.iconStyle = "symbolic";
         this._path = metadata.path || "";
         this._iconShown = "";
         try {
             this.settings = new Settings.AppletSettings(this, metadata.uuid, instanceId);
             this.settings.bind("showLabel", "showCount", () => this._refresh());
-            this.settings.bind("iconStyle", "iconStyle", () => this._applyIcon());
+            this.settings.bind("iconStyle", "iconStyle", () => { this._iconShown = ""; this._refresh(); });
         } catch (e) {
             global.logError(e);
         }
-        this._buildMenu();
-        this._applyIcon();
-        // The extension calls everything in this set when its state changes. The set is
-        // shared, so it works whichever of the two is loaded first.
+        this.menuManager = new PopupMenu.PopupMenuManager(this);
+        this.menu = new Applet.AppletPopupMenu(this, orientation);
+        this.menuManager.addMenu(this.menu);
+        this._buildContextMenu();
         if (!isListenerSet(global.mintywmListeners)) global.mintywmListeners = new Set();
         this._listener = () => this._refresh();
         global.mintywmListeners.add(this._listener);
         this._refresh();
     }
 
-    _buildMenu() {
+    _buildContextMenu() {
         try {
             const add = (label, fn) => {
                 const item = new PopupMenu.PopupMenuItem(label);
@@ -67,54 +55,33 @@ class MintyWMStatus extends Applet.TextIconApplet {
             add("Tiling on or off for this workspace", (api) => api.toggleWorkspace());
             add("Re-tile now", (api) => api.retile());
             add("Reset tile sizes on this workspace", (api) => { if (api.resetSizes) api.resetSizes(); });
+            add("Show key cheat sheet", (api) => { if (api.showCheat) api.showCheat(); });
             this._applet_context_menu.addMenuItem(new PopupMenu.PopupSeparatorMenuItem());
         } catch (e) {
             global.logError(e);
         }
     }
 
-    // Run an action on the extension, if it is there and new enough to have it.
     _call(fn) {
         try {
             const api = global.mintywm;
             if (api && typeof api.toggleTiling === "function") fn(api);
-            else if (api && typeof api.toggle === "function") api.toggle();   // older extension
+            else if (api && typeof api.toggle === "function") api.toggle();
             this._refresh();
         } catch (e) {
             global.logError(e);
         }
     }
 
-    // Symbolic = a single-colour icon that follows the panel theme; colour = the full icon.
-    // Anything missing falls back to a stock icon so the applet never ends up blank.
-    _applyIcon() {
-        const style = this.iconStyle === "colour" ? "colour" : "symbolic";
-        if (style === this._iconShown) return;
-        this._iconShown = style;
-        try {
-            const file = this._path + (style === "colour" ? "/icon.png" : "/mintywm-symbolic.svg");
-            if (this._path && imports.gi.Gio.File.new_for_path(file).query_exists(null)) {
-                if (style === "colour") this.set_applet_icon_path(file);
-                else this.set_applet_icon_symbolic_path(file);
-                return;
-            }
-        } catch (e) {
-            global.logError(e);
-        }
-        this.set_applet_icon_symbolic_name("view-grid-symbolic");
-    }
-
-    // Everything the panel needs in one go. Older extensions have no state(), so ask
-    // the individual properties instead.
     _readState(api) {
         if (typeof api.state === "function") return api.state();
         return {
             on: api.on, globalOn: api.globalOn, workspace: api.workspace,
             excluded: false, tiled: api.tiled, floating: api.floating, overflow: 0,
+            mode: "tile",
         };
     }
 
-    // Poll only when the extension can't tell us about changes itself.
     _setPolling(want) {
         if (want && !this._timer) {
             this._timer = Mainloop.timeout_add(1000, () => {
@@ -127,49 +94,125 @@ class MintyWMStatus extends Applet.TextIconApplet {
         }
     }
 
+    _applyIcon(kind) {
+        const colour = this.iconStyle === "colour" && kind === "on";
+        const file = colour ? "/icon.png"
+            : kind === "paused" ? "/minty-paused-symbolic.svg"
+            : kind === "wsoff" ? "/minty-wsoff-symbolic.svg"
+            : "/mintywm-symbolic.svg";
+        const sig = (colour ? "colour" : "symbolic") + file;
+        if (sig === this._iconShown) return;
+        this._iconShown = sig;
+        try {
+            const path = this._path + file;
+            if (this._path && imports.gi.Gio.File.new_for_path(path).query_exists(null)) {
+                if (colour) this.set_applet_icon_path(path);
+                else this.set_applet_icon_symbolic_path(path);
+                return;
+            }
+        } catch (e) {
+            global.logError(e);
+        }
+        this.set_applet_icon_symbolic_name("view-grid-symbolic");
+    }
+
     _refresh() {
         try {
             const api = global.mintywm;
             this._setPolling(!!api && typeof api.state !== "function");
-            let label, tip, opacity;
+            let label, tip, kind;
             if (!api) {
                 label = "?";
                 tip = "The MintyWM extension is not enabled";
-                opacity = 90;
+                kind = "paused";
             } else {
                 const s = this._readState(api);
                 const ws = s.workspace || "this";
+                const mode = s.mode && s.mode !== "tile" ? " Layout: " + s.mode + "." : "";
                 if (s.on) {
-                    label = String(s.tiled);
-                    tip = "MintyWM tiling: ON on workspace " + ws + " (" + s.tiled + " tiled, " + s.floating + " floating" +
-                        (s.overflow ? ", " + s.overflow + " didn't fit" : "") + ").";
-                    opacity = 255;
+                    label = String(s.tiled) + (s.overflow ? "+" + s.overflow : "");
+                    tip = "MintyWM: ON on workspace " + ws + " (" + s.tiled + " tiled, " +
+                        s.floating + " floating" + (s.overflow ? ", " + s.overflow + " parked because they didn't fit" : "") + ")." + mode;
+                    kind = "on";
                 } else if (s.globalOn === false) {
                     label = "off";
-                    tip = "MintyWM tiling is paused everywhere.";
-                    opacity = 120;
+                    tip = "MintyWM: paused everywhere.";
+                    kind = "paused";
                 } else {
-                    label = "off";
-                    tip = "MintyWM tiling: OFF on workspace " + ws + (s.excluded ? " (it is on the excluded list)." : ".");
-                    opacity = 120;
+                    label = "ws";
+                    tip = "MintyWM: OFF on workspace " + ws + (s.excluded ? " (it is on the excluded list)." : ".") + mode;
+                    kind = "wsoff";
                 }
-                tip += "\nClick: pause or resume tiling everywhere. Middle-click: this workspace only.";
+                tip += "\nClick for controls and keys. Middle-click: this workspace only.";
             }
+            this._applyIcon(kind);
             const show = this.showCount !== false;
-            const key = label + "|" + tip + "|" + opacity + "|" + show;
-            if (key === this._shown) return;   // identical to what is already on screen
+            const key = label + "|" + tip + "|" + show + "|" + kind;
+            if (key === this._shown) return;
             this._shown = key;
             this.set_applet_label(label);
             this.hide_applet_label(!show);
             this.set_applet_tooltip(tip);
-            this.actor.opacity = opacity;
+            this.actor.opacity = 255;
         } catch (e) {
             global.logError(e);
         }
     }
 
+    _rebuildMenu() {
+        this.menu.removeAll();
+        const api = global.mintywm;
+        const add = (label, fn, sensitive) => {
+            const item = new PopupMenu.PopupMenuItem(label);
+            if (sensitive === false) item.setSensitive(false);
+            else item.connect("activate", () => this._call(fn));
+            this.menu.addMenuItem(item);
+            return item;
+        };
+        if (!api) {
+            add("The MintyWM extension is not enabled", null, false);
+            return;
+        }
+        const s = this._readState(api);
+        const ws = s.workspace || "?";
+        if (s.on) {
+            add("Tiling on · workspace " + ws + " · " + s.tiled + " tiled, " + s.floating + " floating", null, false);
+        } else if (s.globalOn === false) {
+            add("Tiling is paused everywhere", null, false);
+        } else {
+            add("Tiling is off on workspace " + ws, null, false);
+        }
+        if (s.overflow) {
+            add(s.overflow + (s.overflow === 1 ? " window didn't fit and was parked on screen" : " windows didn't fit and were parked on screen"), null, false);
+        }
+        if (s.mode && s.mode !== "tile") add("Layout: " + s.mode, null, false);
+        try {
+            const everywhere = new PopupMenu.PopupSwitchMenuItem("Tiling everywhere", s.globalOn !== false);
+            everywhere.connect("toggled", () => this._call((a) => a.toggleTiling()));
+            this.menu.addMenuItem(everywhere);
+            const here = new PopupMenu.PopupSwitchMenuItem("Tiling on workspace " + ws, !!s.on);
+            here.connect("toggled", () => this._call((a) => a.toggleWorkspace()));
+            this.menu.addMenuItem(here);
+        } catch (e) {
+            add(s.globalOn === false ? "Resume tiling everywhere" : "Pause tiling everywhere", (a) => a.toggleTiling());
+            add("Tiling on or off for this workspace", (a) => a.toggleWorkspace());
+        }
+        add("Re-tile now", (a) => a.retile());
+        add("Reset tile sizes on this workspace", (a) => { if (a.resetSizes) a.resetSizes(); });
+        if (typeof api.showCheat === "function") add("Show key cheat sheet", (a) => a.showCheat());
+        const rows = typeof api.keys === "function" ? api.keys() : [];
+        if (rows.length) {
+            this.menu.addMenuItem(new PopupMenu.PopupSeparatorMenuItem());
+            add("Keys", null, false);
+            for (let i = 0; i < rows.length && i < 18; i++) {
+                add(rows[i].keys + "   " + rows[i].action, null, false);
+            }
+        }
+    }
+
     on_applet_clicked() {
-        this._call((api) => api.toggleTiling());
+        this._rebuildMenu();
+        this.menu.toggle();
     }
 
     on_applet_middle_clicked() {

@@ -12,24 +12,14 @@
 // PURPOSE. See the GNU General Public License (the LICENSE file) for details.
 //
 //
-// Hyprland-style "dwindle" auto-tiling and nothing else:
-//   - new windows are tiled automatically; closing/minimising a window re-tiles the rest
-//   - Super+F  toggles the focused window between tiled and floating
-//   - Super+T  turns tiling on/off (off = windows stay where they are)
-//   - Super+Shift+T  re-tiles everything now (and switches tiling on if it was off)
-//   - Super+J / Super+K  focus the next / previous window in layout order
-//   - Super+Shift+J / K  swap the focused window with the next / previous tile
-//   - Super+Shift+H  move the focused window to the first (left) slot
-//   - Super+Alt+T  turns tiling on/off for the workspace you are on (the list is in the settings)
-//   - Super+Shift+F  always float this app (press again to undo); the list is in the settings
-//   - Super+L / Super+H  make the focused tile bigger / smaller (or drag its edge with the mouse);
-//     sizes are kept per workspace. Super+= evens out the workspace you are on
-//   - Floating windows are kept on top of the tiles (switch in the settings), so they don't get lost
-//   - Apps in the "Floating apps" list (Cinnamon's own settings windows and a few tool windows by default) open floating
-//   - Thin keyline border drawn just outside the window (in the gap; never clickable):
-//       mint  = this window has focus (tiled or floating)
-//       pink  = this window is floating, or did not fit in the layout, and is not focused
-//       none  = unfocused tiled window; and no borders at all while tiling is off
+// Hyprland-style dwindle auto-tiling:
+//   - each workspace keeps a real split tree (orientation + ratio stick)
+//   - one key set, Hyprland / Omarchy shaped. Remap any of them in the settings
+//   - Ctrl+Super+arrows move focus, Ctrl+Super+Shift+arrows swap
+//     (Super+arrows stays with Cinnamon's own snapping)
+//   - Super+T float, Super+F fullscreen, Super+J togglesplit, Ctrl+Super+/ cheat sheet
+//   - Windows that do not fit are parked on screen, never left past the edge
+//   - Super+P pseudotile, Super+O pop-out, monocle and work-area fill
 // Settings: System Settings > Extensions > MintyWM > the gear button. Changes apply live.
 // The values in CONFIG below are the defaults (they must match settings-schema.json);
 // they are overwritten by whatever is saved in the settings.
@@ -38,32 +28,56 @@
 const Main = imports.ui.main;
 const Meta = imports.gi.Meta;
 const St = imports.gi.St;
+const Clutter = imports.gi.Clutter;
 const Mainloop = imports.mainloop;
 const Settings = imports.ui.settings;
 
 const UUID = "mintywm@leematthewjackson";
+let ML = null;
+
+function loadLayout(path) {
+    if (ML) return ML;
+    imports.searchPath.unshift(path);
+    ML = imports.mintyLayout.MintyLayout;
+    return ML;
+}
 
 const CONFIG = {
-    keyToggleTiling: "<Super>t",
-    keyToggleFloat: "<Super>f",
-    keyRetile: "<Super><Shift>t",  // turn tiling on (if off) and re-tile everything now
-    keyFocusNext: "<Super>j",      // focus the next window in layout order
-    keyFocusPrev: "<Super>k",      // focus the previous window in layout order
-    keySwapNext: "<Super><Shift>j", // swap the focused window with the next tile
-    keySwapPrev: "<Super><Shift>k", // swap the focused window with the previous tile
-    keyMakeFirst: "<Super><Shift>h", // move the focused window to the first (big, left) slot
-    keyAlwaysFloat: "<Super><Shift>f", // always float (or stop floating) the focused window's app
-    keyToggleWorkspace: "<Super><Alt>t", // turn tiling on/off for the current workspace
-    keyGrow: "<Super>l",           // make the focused tile bigger
-    keyShrink: "<Super>h",         // make the focused tile smaller
-    keyResetSizes: "<Super>equal", // put every tile on this workspace back to even splits
+    keyToggleTiling: "<Super><Control>t",
+    keyToggleFloat: "<Super>t",
+    keyRetile: "<Super><Shift>r",
+    keyAlwaysFloat: "<Super><Shift>t",
+    keyToggleWorkspace: "<Super><Alt>t",
+    keyResetSizes: "<Super><Alt>equal",
+    keyPop: "<Super>o",
+    keyFullscreen: "<Super>f",
+    keyMaximize: "<Super><Alt>f",
+    keyMonocle: "<Super><Control>f",
+    keyToggleSplit: "<Super>j",
+    keyPseudo: "<Super>p",
+    keyClose: "<Super>w",
+    keyFocusLeft: "<Super><Control>Left",
+    keyFocusRight: "<Super><Control>Right",
+    keyFocusUp: "<Super><Control>Up",
+    keyFocusDown: "<Super><Control>Down",
+    keySwapLeft: "<Super><Control><Shift>Left",
+    keySwapRight: "<Super><Control><Shift>Right",
+    keySwapUp: "<Super><Control><Shift>Up",
+    keySwapDown: "<Super><Control><Shift>Down",
+    keyGrowWidth: "<Super>equal",
+    keyShrinkWidth: "<Super>minus",
+    keyGrowHeight: "<Super><Shift>equal",
+    keyShrinkHeight: "<Super><Shift>minus",
+    keyCheatSheet: "<Super><Control>slash",
     resizeStep: 5,     // % of the space a grow/shrink key press moves a divider
-    // Tile sizes you set, per workspace and monitor: { "2:0": [0.6, 0.5] } = on workspace 2,
-    // monitor 0, the first window takes 60% and the next split is even. Saved in the settings.
+    // Legacy positional ratios, kept so an upgrade can seed the split tree once.
     splitRatios: {},
+    // Split trees, per workspace and monitor. Leaves carry no window id; they are
+    // zipped back onto the current windows when the counts still match.
+    layoutTrees: {},
     noTileWorkspaces: "",    // workspace numbers where tiling is off, e.g. "4, 9" or "7-9"
-    innerGap: 30,    // pixels between windows
-    outerGap: 30,    // pixels between windows and screen/panel edges
+    innerGap: 8,     // pixels between windows
+    outerGap: 8,     // pixels between windows and screen/panel edges
     minTileWidth: 200,   // never make a tile smaller than this; extra windows are left alone
     minTileHeight: 120,  // (set both to 0 to tile without limit)
     floatSizePercent: 60,    // size of a window you float when it has no sensible old size
@@ -97,16 +111,23 @@ const CONFIG = {
 const HK_TILING = "mintywm-toggle-tiling";
 const HK_FLOAT = "mintywm-toggle-float";
 const HK_RETILE = "mintywm-retile";
-const HK_NEXT = "mintywm-focus-next";
-const HK_PREV = "mintywm-focus-prev";
-const HK_SWAPN = "mintywm-swap-next";
-const HK_SWAPP = "mintywm-swap-prev";
-const HK_FIRST = "mintywm-make-first";
 const HK_RULE = "mintywm-always-float";
 const HK_WS = "mintywm-toggle-workspace";
-const HK_GROW = "mintywm-grow";
-const HK_SHRINK = "mintywm-shrink";
 const HK_RESET = "mintywm-reset-sizes";
+
+const KEY_IDS = [
+    "keyToggleTiling", "keyToggleFloat", "keyRetile", "keyAlwaysFloat", "keyToggleWorkspace",
+    "keyResetSizes", "keyPop", "keyFullscreen", "keyMaximize",
+    "keyMonocle", "keyToggleSplit", "keyPseudo", "keyClose", "keyFocusLeft", "keyFocusRight",
+    "keyFocusUp", "keyFocusDown", "keySwapLeft", "keySwapRight", "keySwapUp", "keySwapDown",
+    "keyGrowWidth", "keyShrinkWidth", "keyGrowHeight", "keyShrinkHeight", "keyCheatSheet",
+];
+
+// Removed from the settings. Still cleared so a reload does not leave the old hotkey.
+const RETIRED_KEYS = [
+    "keyFocusNext", "keyFocusPrev", "keySwapNext", "keySwapPrev",
+    "keyMakeFirst", "keyGrow", "keyShrink",
+];
 
 const NO_MARKS = { focus: false, float: false };
 
@@ -115,120 +136,8 @@ function isListenerSet(s) {
     return !!s && typeof s.add === "function" && typeof s.delete === "function" && typeof s[Symbol.iterator] === "function";
 }
 
-// ---------------------------------------------------------------------------
-// Pure layout code (no GNOME/Muffin imports, so it can be tested with node).
-// Windows are placed in order. Each window takes a share of the remaining
-// rectangle (half, unless you resized it: see `ratios`); the split runs
-// side-by-side when the rectangle is at least as wide as it is tall, otherwise
-// top-and-bottom. The last window gets what is left.
-// ---------------------------------------------------------------------------
-// --- layout:begin
-const RATIO_MIN = 0.15;
-const RATIO_MAX = 0.85;
-
-// The share of split i (0 = the first, main split). Missing or odd values mean half.
-function splitRatio(ratios, i) {
-    const r = ratios ? ratios[i] : undefined;
-    if (typeof r !== "number" || !(r > 0 && r < 1)) return 0.5;
-    return Math.min(RATIO_MAX, Math.max(RATIO_MIN, r));
-}
-
-// The full layout: the cells, and for each split the rectangle it divided and which
-// way it ran (horizontal = side by side). The splits are what a resize changes.
-function dwindlePlan(area, count, innerGap, outerGap, ratios) {
-    if (count <= 0) return { cells: [], splits: [] };
-    const half = Math.floor(innerGap / 2);
-    const inset = outerGap - half;
-    let rest = {
-        x: area.x + inset,
-        y: area.y + inset,
-        width: area.width - 2 * inset,
-        height: area.height - 2 * inset,
-    };
-    const cells = [];
-    const splits = [];
-    for (let i = 0; i < count; i++) {
-        let cell;
-        if (i === count - 1) {
-            cell = rest;
-        } else if (rest.width >= rest.height) {
-            const w = Math.floor(rest.width * splitRatio(ratios, i));
-            splits.push({ rest, horizontal: true });
-            cell = { x: rest.x, y: rest.y, width: w, height: rest.height };
-            rest = { x: rest.x + w, y: rest.y, width: rest.width - w, height: rest.height };
-        } else {
-            const h = Math.floor(rest.height * splitRatio(ratios, i));
-            splits.push({ rest, horizontal: false });
-            cell = { x: rest.x, y: rest.y, width: rest.width, height: h };
-            rest = { x: rest.x, y: rest.y + h, width: rest.width, height: rest.height - h };
-        }
-        cells.push({
-            x: cell.x + half,
-            y: cell.y + half,
-            width: Math.max(1, cell.width - 2 * half),
-            height: Math.max(1, cell.height - 2 * half),
-        });
-    }
-    return { cells, splits };
-}
-
-function dwindle(area, count, innerGap, outerGap, ratios) {
-    return dwindlePlan(area, count, innerGap, outerGap, ratios).cells;
-}
-
-// Grow (delta > 0) or shrink the window at `index` of `count` tiles. A window grows by
-// moving its own divider; the last window has none, so it moves the one before it the
-// other way. Returns the new ratios, or null when there is nothing to change.
-function resizeSplits(ratios, index, count, delta) {
-    if (count < 2 || index < 0 || index >= count) return null;
-    const k = index < count - 1 ? index : count - 2;
-    const d = index < count - 1 ? delta : -delta;
-    const out = [];
-    for (let i = 0; i < Math.max(k + 1, (ratios || []).length); i++) out.push(splitRatio(ratios, i));
-    const next = Math.round(Math.min(RATIO_MAX, Math.max(RATIO_MIN, out[k] + d)) * 1000) / 1000;
-    if (next === out[k]) return null;
-    out[k] = next;
-    return out;
-}
-
-// A divider dragged to `pos` (x for a side-by-side split, y otherwise): the new share.
-function ratioAt(split, pos) {
-    const r = split.rest;
-    const share = split.horizontal ? (pos - r.x) / r.width : (pos - r.y) / r.height;
-    return Math.round(Math.min(RATIO_MAX, Math.max(RATIO_MIN, share)) * 1000) / 1000;
-}
-
-// Saved sizes are keyed "workspace:monitor" (workspace 1-based). When a workspace is
-// removed, the ones after it are renumbered, like the excluded-workspace list.
-function shiftSplitKeys(obj, removed, count) {
-    if (removed > count) return null;
-    const out = {};
-    for (const key of Object.keys(obj || {})) {
-        const m = /^(\d+):(\d+)$/.exec(key);
-        if (!m) continue;
-        const ws = parseInt(m[1], 10);
-        if (ws === removed) continue;
-        out[(ws > removed && ws <= count + 1 ? ws - 1 : ws) + ":" + m[2]] = obj[key];
-    }
-    return out;
-}
-
-// How many of `count` windows can be tiled before a tile gets smaller than the
-// minimum? Always at least 1 (when there is at least one window).
-// `mins` (optional) holds each window's own smallest size, { w, h } or null, for
-// windows that are known to refuse a smaller tile. `ratios`: see dwindlePlan.
-function fitCount(area, count, innerGap, outerGap, minW, minH, mins, ratios) {
-    for (let n = count; n > 1; n--) {
-        const cells = dwindle(area, n, innerGap, outerGap, ratios);
-        const fits = cells.every((c, i) => {
-            const m = (mins && mins[i]) || null;
-            return c.width >= Math.max(minW, m ? m.w : 0) &&
-                c.height >= Math.max(minH, m ? m.h : 0);
-        });
-        if (fits) return n;
-    }
-    return count > 0 ? 1 : 0;
-}
+// Geometry lives in mintyLayout.js (node-tested). What stays here is the
+// window-matching and the workspace-list parsing, which talk to settings text.
 
 
 // Case-insensitive match where * stands for any text. An empty pattern matches nothing.
@@ -340,10 +249,19 @@ class MintyWM {
         this._stuckId = 0;           // the check for window pictures drawn in the wrong place
         this._targets = new Map();   // window -> { x, y, tries }: where the last pass put it
         this._minSize = new Map();   // window -> { w, h }: it refused to be made smaller than this
-        this._overflow = new Set();  // eligible windows that did not fit in the last pass
-        this._splits = {};           // "workspace:monitor" -> [ratio per split]; see CONFIG.splitRatios
-        this._cells = new Map();     // window -> where the last pass put it, and the plan it came from
-        this._splitsSaveId = 0;
+        this._overflow = new Set();  // eligible windows that did not fit, parked back on screen
+        this._trees = {};            // "workspace:monitor" -> split tree
+        this._treeSaveId = 0;
+        this._usedSave = {};         // saved tree applied at most once per key per session
+        this._reinsert = new Set();  // windows that should rejoin the tree as the newest leaf
+        this._modes = {};            // "workspace:monitor" -> "monocle" | "max" | absent
+        this._wids = new Map();      // window -> stable id for this session
+        this._widNext = 1;
+        this._cells = new Map();     // window -> { key, area, rect, chain, id }
+        this._hidden = new Set();    // actors hidden by monocle / maximize
+        this._cheat = null;
+        this._cheatKey = 0;
+        this._writingKeys = false;
         this._borders = new Map();      // window -> { box, parent, sig, style, shown }
         this._lastFocus = null;
         this._settings = null;
@@ -362,7 +280,6 @@ class MintyWM {
         } catch (e) {}
         this._bindSettings();
         this._noTile = parseWorkspaceList(CONFIG.noTileWorkspaces);
-        this._loadSplits();
         this._connect(global.display, "window-created", (display, win) => {
             if (this._consider(win)) this._settle();
         });
@@ -376,12 +293,16 @@ class MintyWM {
         }
         this._connect(global.window_manager, "switch-workspace", () => this._settle());
         this._connect(Main.layoutManager, "monitors-changed", () => {
+            this._minSize.clear();   // a minimum learned on another screen does not apply here
             this._settle();
             // Panels and work areas can take a moment to settle after a monitor change
             // or a resume, so lay out once more a little later.
             this._later(1000, () => this._settle());
         });
-        this._connect(global.display, "workareas-changed", () => this._settle(), true);
+        this._connect(global.display, "workareas-changed", () => {
+            this._minSize.clear();
+            this._settle();
+        }, true);
         this._connect(global.display, "grab-op-begin", () => this._targets.clear(), true);
         this._connect(global.display, "grab-op-end", (...args) => this._onGrabEnd(args), true);
         this._connect(global.workspace_manager, "workspace-removed",
@@ -399,6 +320,8 @@ class MintyWM {
             get floating() { return self._counts().floating; },
             // Everything above in one go (one pass over the windows).
             state() { return self._state(); },
+            keys() { return self._keyRows(); },
+            showCheat() { self._toggleCheat(); },
             toggleTiling() { self.toggleTiling(); },
             toggleWorkspace() { self.toggleWorkspace(); },
             retile() { self.retile(); },
@@ -417,13 +340,16 @@ class MintyWM {
 
         for (const actor of global.get_window_actors()) this._consider(actor.meta_window);
         this._lastFocus = global.display.focus_window;
+        this._migrateSavedKeys();
         this._retile();
     }
 
     disable() {
-        for (const hk of [HK_TILING, HK_FLOAT, HK_RETILE, HK_NEXT, HK_PREV, HK_SWAPN, HK_SWAPP, HK_FIRST, HK_RULE, HK_WS, HK_GROW, HK_SHRINK, HK_RESET]) {
-            try { Main.keybindingManager.removeHotKey(hk); } catch (e) {}
+        for (const id of KEY_IDS.concat(RETIRED_KEYS)) {
+            try { Main.keybindingManager.removeHotKey("mintywm-" + id); } catch (e) {}
         }
+        this._hideCheat();
+        this._unhideAll();
         if (this._settings) {
             try { this._settings.finalize(); } catch (e) {}
             this._settings = null;
@@ -461,9 +387,11 @@ class MintyWM {
         this._minSize.clear();
         this._overflow.clear();
         this._cells.clear();
-        if (this._splitsSaveId) this._saveSplitsNow();   // don't lose a resize made just now
-        this._splits = {};
-        this._splitsSaveId = 0;
+        if (this._treeSaveId) this._saveTreesNow();
+        this._trees = {};
+        this._treeSaveId = 0;
+        this._modes = {};
+        this._hidden.clear();
         this._settleId = 0;
         this._settleSince = 0;
         this._afterId = 0;
@@ -478,20 +406,19 @@ class MintyWM {
     // Bind the saved settings straight onto CONFIG, so the rest of the code just reads
     // CONFIG. If the settings system is unavailable for any reason, the defaults stay.
     _bindSettings() {
-        const KEYS = ["keyToggleTiling", "keyToggleFloat", "keyRetile", "keyFocusNext",
-                      "keyFocusPrev", "keySwapNext", "keySwapPrev", "keyMakeFirst", "keyAlwaysFloat", "keyToggleWorkspace",
-                      "keyGrow", "keyShrink", "keyResetSizes"];
+        const KEYS = KEY_IDS;
         const LOOK = ["innerGap", "outerGap", "minTileWidth", "minTileHeight", "floatSizePercent", "floatOnTop",
                       "borders", "focusColor", "floatColor", "borderWidth", "cornerRadius",
                       "cornerEach", "radiusTopLeft", "radiusTopRight", "radiusBottomLeft", "radiusBottomRight"];
         try {
             this._settings = new Settings.ExtensionSettings(CONFIG, UUID);
             const dir = Settings.BindingDirection.IN;
-            for (const k of KEYS) this._settings.bindProperty(dir, k, k, () => this._bindKeys(), null);
+            for (const k of KEYS) this._settings.bindProperty(dir, k, k, () => this._onKeyChanged(), null);
             for (const k of LOOK) this._settings.bindProperty(dir, k, k, () => this._onLookChanged(), null);
             this._settings.bindProperty(dir, "notify", "notify", null, null);
             this._settings.bindProperty(dir, "resizeStep", "resizeStep", null, null);
-            this._settings.bindProperty(dir, "splitRatios", "splitRatios", () => { this._loadSplits(); this._settle(); }, null);
+            this._settings.bindProperty(dir, "splitRatios", "splitRatios", null, null);
+            this._settings.bindProperty(dir, "layoutTrees", "layoutTrees", () => this._settle(), null);
             this._settings.bindProperty(dir, "debug", "debug", () => { this._lastDump = ""; this._debugLog(); }, null);
             this._settings.bindProperty(dir, "floatRules", "floatRules", () => this._reapplyRules(), null);
             this._settings.bindProperty(dir, "noTileWorkspaces", "noTileWorkspaces", () => this._onWorkspacesChanged(), null);
@@ -500,27 +427,100 @@ class MintyWM {
         }
     }
 
+    _onKeyChanged() {
+        if (this._writingKeys) return;
+        this._bindKeys();
+    }
+
+    // Earlier test builds used Super+arrows, then a separate Classic set.
+    // If a saved binding is still exactly one of those, move it to the current default.
+    // A binding you changed yourself is left alone.
+    _migrateSavedKeys() {
+        const legacy = {
+            keyToggleTiling: "<Super>t",
+            keyToggleFloat: "<Super>f",
+            keyAlwaysFloat: "<Super><Shift>f",
+            keyFullscreen: "<Super><Control>f",
+            keyMonocle: "<Super><Control><Alt>f",
+            keyToggleSplit: "<Super><Control>j",
+            keyGrowWidth: "<Super><Control>l",
+            keyShrinkWidth: "<Super><Control>h",
+            keyGrowHeight: "<Super><Control><Shift>l",
+            keyShrinkHeight: "<Super><Control><Shift>h",
+            keyResetSizes: "<Super>equal",
+            keyRetile: "<Super><Shift>t",
+            keyCheatSheet: "<Super>slash",
+            keyFocusLeft: "<Super>Left",
+            keyFocusRight: "<Super>Right",
+            keyFocusUp: "<Super>Up",
+            keyFocusDown: "<Super>Down",
+            keySwapLeft: "<Super><Shift>Left",
+            keySwapRight: "<Super><Shift>Right",
+            keySwapUp: "<Super><Shift>Up",
+            keySwapDown: "<Super><Shift>Down",
+        };
+        const want = ML && ML.DEFAULT_KEYS;
+        if (!this._settings || !want) return;
+        const oldCheat = { "<Super>k": true, "<Super>slash": true, "<Super>question": true };
+        let changed = false;
+        this._writingKeys = true;
+        try {
+            for (const key of KEY_IDS) {
+                if (key === "keyCheatSheet") {
+                    if (!oldCheat[CONFIG.keyCheatSheet] || CONFIG.keyCheatSheet === want.keyCheatSheet) continue;
+                } else if (!Object.prototype.hasOwnProperty.call(legacy, key) || CONFIG[key] !== legacy[key] || legacy[key] === want[key]) {
+                    continue;
+                }
+                this._settings.setValue(key, want[key]);
+                CONFIG[key] = want[key];
+                changed = true;
+            }
+        } catch (e) {
+            global.logError(e);
+        }
+        this._writingKeys = false;
+        if (changed) this._bindKeys();
+    }
+
     // (Re)register every hotkey from CONFIG. Safe to call repeatedly.
     _bindKeys() {
-        const table = [
-            [HK_TILING, "keyToggleTiling", () => this.toggleTiling()],
-            [HK_FLOAT, "keyToggleFloat", () => this.toggleFloat()],
-            [HK_RETILE, "keyRetile", () => this.retile()],
-            [HK_NEXT, "keyFocusNext", () => this.focusStep(1)],
-            [HK_PREV, "keyFocusPrev", () => this.focusStep(-1)],
-            [HK_SWAPN, "keySwapNext", () => this.swapStep(1)],
-            [HK_SWAPP, "keySwapPrev", () => this.swapStep(-1)],
-            [HK_FIRST, "keyMakeFirst", () => this.makeFirst()],
-            [HK_RULE, "keyAlwaysFloat", () => this.alwaysFloat()],
-            [HK_WS, "keyToggleWorkspace", () => this.toggleWorkspace()],
-            [HK_GROW, "keyGrow", () => this.resizeFocused(1)],
-            [HK_SHRINK, "keyShrink", () => this.resizeFocused(-1)],
-            [HK_RESET, "keyResetSizes", () => this.resetSizes()],
-        ];
-        for (const [name, key, fn] of table) {
+        const fns = {
+            keyToggleTiling: () => this.toggleTiling(),
+            keyToggleFloat: () => this.toggleFloat(),
+            keyRetile: () => this.retile(),
+            keyAlwaysFloat: () => this.alwaysFloat(),
+            keyToggleWorkspace: () => this.toggleWorkspace(),
+            keyResetSizes: () => this.resetSizes(),
+            keyPop: () => this.popWindow(),
+            keyFullscreen: () => this.toggleFullscreen(),
+            keyMaximize: () => this.toggleMode("max"),
+            keyMonocle: () => this.toggleMode("monocle"),
+            keyToggleSplit: () => this.toggleSplit(),
+            keyPseudo: () => this.togglePseudo(),
+            keyClose: () => this.closeWindow(),
+            keyFocusLeft: () => this.focusDir("left"),
+            keyFocusRight: () => this.focusDir("right"),
+            keyFocusUp: () => this.focusDir("up"),
+            keyFocusDown: () => this.focusDir("down"),
+            keySwapLeft: () => this.swapDir("left"),
+            keySwapRight: () => this.swapDir("right"),
+            keySwapUp: () => this.swapDir("up"),
+            keySwapDown: () => this.swapDir("down"),
+            keyGrowWidth: () => this.resizeAxis("h", 1),
+            keyShrinkWidth: () => this.resizeAxis("h", -1),
+            keyGrowHeight: () => this.resizeAxis("v", 1),
+            keyShrinkHeight: () => this.resizeAxis("v", -1),
+            keyCheatSheet: () => this._toggleCheat(),
+        };
+        for (const old of RETIRED_KEYS) {
+            try { Main.keybindingManager.removeHotKey("mintywm-" + old); } catch (e) {}
+        }
+        for (const key of KEY_IDS) {
+            const name = "mintywm-" + key;
             try { Main.keybindingManager.removeHotKey(name); } catch (e) {}
             const binding = CONFIG[key];
-            if (!binding) continue;   // the user cleared it: leave that action unbound
+            const fn = fns[key];
+            if (!binding || !fn) continue;   // cleared, or not an action: leave it unbound
             try {
                 if (Main.keybindingManager.addHotKey(name, binding, fn) === false) {
                     global.logWarning("MintyWM: could not bind " + binding + " (" + key + "); is it used by something else?");
@@ -612,9 +612,13 @@ class MintyWM {
             const next = shiftWorkspaceList(this._noTile, index + 1, count);
             if (next) { this._saveNoTile(next); changed = true; }
         }
-        if (Object.keys(this._splits).length) {
-            const next = shiftSplitKeys(this._splits, index + 1, count);
-            if (next) { this._splits = next; this._saveSplitsNow(); changed = true; }
+        if (Object.keys(this._trees).length) {
+            const next = ML.shiftKeyMap(this._trees, index + 1, count);
+            if (next) { this._trees = next; this._saveTreesNow(); changed = true; }
+        }
+        if (Object.keys(this._modes).length) {
+            const next = ML.shiftKeyMap(this._modes, index + 1, count);
+            if (next) { this._modes = next; changed = true; }
         }
         if (changed) this._settle();
     }
@@ -651,66 +655,12 @@ class MintyWM {
         this._retile();
         // Re-send every window's size, even ones already in place: this is what un-sticks
         // a window whose picture is drawn somewhere else (see _pictureOff).
-        for (const win of this._visibleHere()) this._nudge(win);
+        // Terminals snap to a character cell, so a 1px nudge can grow them off the screen.
+        for (const win of this._visibleHere()) {
+            if (!this._isTerminal(win)) this._nudge(win);
+        }
         this._stuckCheck(1);
         this._say("Re-tiled");
-    }
-
-    // Move focus to the next (+1) or previous (-1) window, wrapping round.
-    // Order: by monitor, then arrival order (the same order the layout uses).
-    // Floating windows are included; minimised ones and other workspaces are not.
-    focusStep(dir) {
-        const workspace = global.workspace_manager.get_active_workspace();
-        const list = [];
-        this._order.forEach((win, i) => {
-            if (this._navigable(win, workspace)) list.push({ win, mon: win.get_monitor(), i });
-        });
-        if (list.length === 0) return;
-        list.sort((a, b) => (a.mon - b.mon) || (a.i - b.i));
-        const wins = list.map((e) => e.win);
-        const cur = wins.indexOf(global.display.focus_window);
-        const next = cur < 0
-            ? (dir > 0 ? 0 : wins.length - 1)
-            : (cur + dir + wins.length) % wins.length;
-        try {
-            wins[next].activate(global.get_current_time());
-        } catch (e) {
-            global.logError(e);
-        }
-    }
-
-    // The tiled windows on the focused window's monitor, in layout order.
-    _tiledWith(win) {
-        const workspace = global.workspace_manager.get_active_workspace();
-        const mon = win.get_monitor();
-        return this._order.filter((w) => this._eligible(w, workspace) && w.get_monitor() === mon);
-    }
-
-    // Swap the focused tile with the next (+1) or previous (-1) one, wrapping round.
-    swapStep(dir) {
-        const win = global.display.focus_window;
-        if (!win || !this._known.has(win)) return;
-        const tiled = this._tiledWith(win);
-        const i = tiled.indexOf(win);
-        if (i < 0 || tiled.length < 2) return;
-        const other = tiled[(i + dir + tiled.length) % tiled.length];
-        const a = this._order.indexOf(win);
-        const b = this._order.indexOf(other);
-        this._order[a] = other;
-        this._order[b] = win;
-        this._retile();
-    }
-
-    // Move the focused tile to the first slot; everything else shifts along.
-    makeFirst() {
-        const win = global.display.focus_window;
-        if (!win || !this._known.has(win)) return;
-        const tiled = this._tiledWith(win);
-        if (tiled.indexOf(win) <= 0) return;
-        const at = this._order.indexOf(tiled[0]);
-        this._order.splice(this._order.indexOf(win), 1);
-        this._order.splice(at, 0, win);
-        this._retile();
     }
 
     toggleFloat() {
@@ -757,87 +707,98 @@ class MintyWM {
         }
     }
 
-    // ----- tile sizes -------------------------------------------------------
+    // ----- split tree -------------------------------------------------------
 
-    // Take the saved sizes from the settings, keeping only well-formed entries.
-    _loadSplits() {
-        const src = CONFIG.splitRatios;
+    _wid(win) {
+        let id = this._wids.get(win);
+        if (!id) {
+            id = "w" + this._widNext++;
+            this._wids.set(win, id);
+        }
+        return id;
+    }
+
+    _keyFor(win) {
+        const ws = global.workspace_manager.get_active_workspace();
+        return (ws.index() + 1) + ":" + win.get_monitor();
+    }
+
+    _placedIds(win) {
+        if (!win || !ML || !this._known.has(win) || this._floating.has(win)) return null;
+        const info = this._cells.get(win);
+        const key = info ? info.key : this._keyFor(win);
+        const tree = this._trees[key];
+        if (!tree) return null;
+        return { key, tree, id: this._wid(win), ids: ML.inOrder(tree), area: info ? info.area : null };
+    }
+
+    _saveTreesSoon() {
+        if (this._treeSaveId) this._cancel(this._treeSaveId);
+        this._treeSaveId = this._later(500, () => this._saveTreesNow());
+    }
+
+    _saveTreesNow() {
+        if (this._treeSaveId) this._cancel(this._treeSaveId);
+        this._treeSaveId = 0;
         const out = {};
-        if (src && typeof src === "object") {
-            for (const key of Object.keys(src)) {
-                if (/^\d+:\d+$/.test(key) && Array.isArray(src[key])) {
-                    out[key] = src[key].map((r, i) => splitRatio(src[key], i));
-                }
-            }
+        for (const key of Object.keys(this._trees)) {
+            const dumped = ML.serialize(this._trees[key]);
+            if (dumped) out[key] = dumped;
         }
-        this._splits = out;
-    }
-
-    _ratiosFor(key) {
-        const r = this._splits[key];
-        return Array.isArray(r) ? r.slice() : [];
-    }
-
-    // Store new sizes for one workspace/monitor. Even splits are simply forgotten.
-    _setRatios(key, ratios) {
-        if (!ratios || ratios.every((r) => r === 0.5)) delete this._splits[key];
-        else this._splits[key] = ratios;
-        // A key held down gives a burst of changes: write the settings file once, after it.
-        if (this._splitsSaveId) this._cancel(this._splitsSaveId);
-        this._splitsSaveId = this._later(500, () => this._saveSplitsNow());
-    }
-
-    _saveSplitsNow() {
-        if (this._splitsSaveId) this._cancel(this._splitsSaveId);
-        this._splitsSaveId = 0;
-        CONFIG.splitRatios = JSON.parse(JSON.stringify(this._splits));
+        CONFIG.layoutTrees = out;
         if (this._settings) {
-            try { this._settings.setValue("splitRatios", CONFIG.splitRatios); } catch (e) { global.logError(e); }
+            try { this._settings.setValue("layoutTrees", out); } catch (e) { global.logError(e); }
         }
     }
 
-    // Super+L / Super+H: make the focused tile bigger (+1) or smaller (-1). Its divider
-    // moves; the other tiles on the workspace make room. Nothing happens if a tile would
-    // end up smaller than the minimum tile size.
-    resizeFocused(dir) {
+    _treeFits(tree, area) {
+        if (!tree || !area || !ML) return true;
+        const mins = {};
+        for (const [win, size] of this._minSize) mins[this._wid(win)] = size;
+        return ML.layoutTree(tree, area, CONFIG.innerGap, CONFIG.outerGap).every((c) => {
+            const own = mins[c.id];
+            const w = Math.max(CONFIG.minTileWidth, own && own.w ? own.w : 0);
+            const h = Math.max(CONFIG.minTileHeight, own && own.h ? own.h : 0);
+            return c.rect.width + 0.5 >= w && c.rect.height + 0.5 >= h;
+        });
+    }
+
+    _step() {
+        return Math.max(1, Math.min(25, Number(CONFIG.resizeStep) || 5)) / 100;
+    }
+
+    // Super+= / Super+- : one axis, whichever split actually controls it.
+    resizeAxis(axis, dir) {
         const win = global.display.focus_window;
-        const p = win ? this._cells.get(win) : null;
-        if (!p || p.count < 2) return;
-        const step = Math.max(1, Math.min(25, Number(CONFIG.resizeStep) || 5)) / 100;
-        const next = resizeSplits(p.ratios, p.index, p.count, dir * step);
-        if (!next || !this._fits(p, next)) return;
-        this._setRatios(p.key, next);
+        const placed = this._placedIds(win);
+        if (!placed || placed.ids.length < 2) return;
+        const next = ML.resizeAlong(placed.tree, placed.id, axis, dir * this._step());
+        if (!next || (placed.area && !this._treeFits(next, placed.area))) return;
+        this._trees[placed.key] = next;
+        this._saveTreesSoon();
         this._retile();
     }
 
-    // Would every tile in this plan still be at least the minimum size with these ratios?
-    _fits(p, ratios) {
-        return dwindle(p.area, p.count, CONFIG.innerGap, CONFIG.outerGap, ratios).every((c) =>
-            c.width >= CONFIG.minTileWidth && c.height >= CONFIG.minTileHeight);
-    }
-
-    // Super+=: even splits again on the workspace you are on (every monitor).
     resetSizes() {
         const prefix = this._workspaceNumber() + ":";
         let any = false;
-        for (const key of Object.keys(this._splits)) {
-            if (key.startsWith(prefix)) { delete this._splits[key]; any = true; }
+        for (const key of Object.keys(this._trees)) {
+            if (!key.startsWith(prefix)) continue;
+            this._trees[key] = ML.evenSplits(this._trees[key]);
+            any = true;
         }
-        if (any) this._saveSplitsNow();
+        if (any) this._saveTreesNow();
         this._retile();
         this._say("Window sizes reset on workspace " + this._workspaceNumber());
     }
 
-    // The settings page button: even splits everywhere.
     resetAllSizes() {
-        this._splits = {};
-        this._saveSplitsNow();
+        for (const key of Object.keys(this._trees)) this._trees[key] = ML.evenSplits(this._trees[key]);
+        this._saveTreesNow();
         this._retile();
         this._say("Window sizes reset on every workspace");
     }
 
-    // A mouse drag (or Alt+F8) ended. If it resized a tile, move the divider it dragged so
-    // the layout keeps that size; a plain move just snaps back into place.
     _onGrabEnd(args) {
         let win = null;
         for (const a of args) {
@@ -848,31 +809,225 @@ class MintyWM {
         this._settle();
     }
 
+    // A drag that changes both axes keeps both, when each edge is a real divider.
     _learnResize(win) {
         const p = this._cells.get(win);
-        if (!p || p.count < 2 || this._floating.has(win)) return;
+        if (!p || !p.chain || !p.chain.length || this._floating.has(win) || !this._trees[p.key]) return;
         let f;
         try { f = win.get_frame_rect(); } catch (e) { return; }
-        const c = p.cell;
-        if (Math.abs(f.width - c.width) <= 2 && Math.abs(f.height - c.height) <= 2) return;   // moved, not resized
+        const c = p.rect;
+        if (Math.abs(f.width - c.width) <= 2 && Math.abs(f.height - c.height) <= 2) return;
         const half = Math.floor(CONFIG.innerGap / 2);
-        // Each edge of a tile is a divider: right/bottom = its own split, left/top = the
-        // split before it. Take the edge that moved furthest, if it is a real divider.
         const edges = [
-            { k: p.index, horizontal: true, moved: (f.x + f.width) - (c.x + c.width), pos: f.x + f.width + half },
-            { k: p.index, horizontal: false, moved: (f.y + f.height) - (c.y + c.height), pos: f.y + f.height + half },
-            { k: p.index - 1, horizontal: true, moved: f.x - c.x, pos: f.x - half },
-            { k: p.index - 1, horizontal: false, moved: f.y - c.y, pos: f.y - half },
-        ].filter((e) => e.k >= 0 && e.k < p.splits.length && p.splits[e.k].horizontal === e.horizontal &&
-            Math.abs(e.moved) > 2)
+            { horizontal: true, edge: "end", moved: (f.x + f.width) - (c.x + c.width), pos: f.x + f.width + half },
+            { horizontal: false, edge: "end", moved: (f.y + f.height) - (c.y + c.height), pos: f.y + f.height + half },
+            { horizontal: true, edge: "start", moved: f.x - c.x, pos: f.x - half },
+            { horizontal: false, edge: "start", moved: f.y - c.y, pos: f.y - half },
+        ].filter((e) => Math.abs(e.moved) > 2)
          .sort((a, b) => Math.abs(b.moved) - Math.abs(a.moved));
-        if (!edges.length) return;
-        const e = edges[0];
-        const next = [];
-        for (let i = 0; i < Math.max(e.k + 1, p.ratios.length); i++) next.push(splitRatio(p.ratios, i));
-        next[e.k] = ratioAt(p.splits[e.k], e.pos);
-        if (!this._fits(p, next)) return;   // too small for the minimum tile size: snap back
-        this._setRatios(p.key, next);
+        let tree = this._trees[p.key];
+        let any = false;
+        for (const e of edges.slice(0, 2)) {
+            const anc = p.chain.find((a) => a.horizontal === e.horizontal &&
+                ((a.side === "a" && e.edge === "end") || (a.side === "b" && e.edge === "start")));
+            if (!anc) continue;
+            const ratio = ML.ratioAt(anc.rect, e.horizontal, e.pos);
+            const next = ML.setRatioAt(tree, anc.path, ratio);
+            if (!this._treeFits(next, p.area)) continue;
+            tree = next;
+            any = true;
+        }
+        if (!any) return;
+        this._trees[p.key] = tree;
+        this._saveTreesSoon();
+    }
+
+    // ----- directional focus, modes, cheat sheet ---------------------------
+
+    _focusCandidates(win) {
+        const workspace = global.workspace_manager.get_active_workspace();
+        const mon = win.get_monitor();
+        const list = [];
+        const seen = new Set();
+        for (const [other, info] of this._cells) {
+            if (other === win || !this._navigable(other, workspace)) continue;
+            try { if (other.get_monitor() !== mon) continue; } catch (e) { continue; }
+            if (!info.rect) continue;
+            list.push({ id: other, rect: info.rect });
+            seen.add(other);
+        }
+        for (const other of this._order) {
+            if (seen.has(other) || other === win || !this._floating.has(other)) continue;
+            if (!this._navigable(other, workspace)) continue;
+            try {
+                if (other.get_monitor() !== mon) continue;
+                const f = other.get_frame_rect();
+                list.push({ id: other, rect: { x: f.x, y: f.y, width: f.width, height: f.height } });
+            } catch (e) {}
+        }
+        return list;
+    }
+
+    focusDir(dir) {
+        const win = global.display.focus_window;
+        if (!win || !ML) return;
+        let from;
+        try { from = win.get_frame_rect(); } catch (e) { return; }
+        const target = ML.focusDirection(from, this._focusCandidates(win), dir);
+        if (!target) return;
+        try { target.activate(global.get_current_time()); } catch (e) { global.logError(e); }
+    }
+
+    swapDir(dir) {
+        const win = global.display.focus_window;
+        const placed = this._placedIds(win);
+        if (!placed || !ML) return;
+        let from;
+        try { from = win.get_frame_rect(); } catch (e) { return; }
+        const target = ML.focusDirection(from, this._focusCandidates(win), dir);
+        if (!target || target === win || this._floating.has(target)) return;
+        const other = this._wid(target);
+        if (placed.ids.indexOf(other) < 0) return;
+        this._trees[placed.key] = ML.swapLeaves(placed.tree, placed.id, other);
+        this._saveTreesSoon();
+        this._retile();
+    }
+
+    toggleSplit() {
+        const placed = this._placedIds(global.display.focus_window);
+        if (!placed) return;
+        this._trees[placed.key] = ML.toggleSplit(placed.tree, placed.id);
+        this._saveTreesSoon();
+        this._retile();
+    }
+
+    togglePseudo() {
+        const placed = this._placedIds(global.display.focus_window);
+        if (!placed) return;
+        this._trees[placed.key] = ML.togglePseudo(placed.tree, placed.id);
+        this._saveTreesSoon();
+        this._retile();
+        this._say("Pseudotile");
+    }
+
+    toggleMode(mode) {
+        const win = global.display.focus_window;
+        if (!win) return;
+        const key = this._keyFor(win);
+        if (this._modes[key] === mode) delete this._modes[key];
+        else this._modes[key] = mode;
+        const now = this._modes[key];
+        this._say(now === "monocle" ? "Monocle" : now === "max" ? "Filled the work area" : "Tiled");
+        this._retile();
+    }
+
+    toggleFullscreen() {
+        const win = global.display.focus_window;
+        if (!win) return;
+        try {
+            if (win.is_fullscreen()) {
+                if (typeof win.unmake_fullscreen === "function") win.unmake_fullscreen();
+                else win.fullscreen = false;
+            } else if (typeof win.make_fullscreen === "function") {
+                win.make_fullscreen();
+            } else {
+                win.fullscreen = true;
+            }
+        } catch (e) {
+            global.logError(e);
+        }
+    }
+
+    popWindow() {
+        const win = global.display.focus_window;
+        if (!win || !this._known.has(win)) return;
+        this._userTouched.add(win);
+        this._ruled.delete(win);
+        if (this._floating.has(win)) {
+            this._floating.delete(win);
+            this._bump(win);
+            this._say("Tiled");
+        } else {
+            this._floating.add(win);
+            this._restoreFloat(win);
+            this._setAbove(win, true);
+            this._say("Popped out");
+        }
+        this._retile();
+    }
+
+    closeWindow() {
+        const win = global.display.focus_window;
+        if (!win) return;
+        try { win.delete(global.get_current_time()); } catch (e) { global.logError(e); }
+    }
+
+    _keyRows() {
+        const rows = [];
+        const labels = ML ? ML.KEY_LABELS : [];
+        for (const pair of labels) {
+            const accel = keyLabel(CONFIG[pair[0]]);
+            if (!accel) continue;
+            rows.push({ keys: accel, action: pair[1] });
+        }
+        return rows;
+    }
+
+    _hideCheat() {
+        if (this._cheatKey) {
+            try { global.stage.disconnect(this._cheatKey); } catch (e) {}
+            this._cheatKey = 0;
+        }
+        if (this._cheat) {
+            try { this._cheat.destroy(); } catch (e) {}
+            this._cheat = null;
+        }
+    }
+
+    _toggleCheat() {
+        if (this._cheat) { this._hideCheat(); return; }
+        try {
+            const monitor = Main.layoutManager.primaryMonitor || Main.layoutManager.monitors[0];
+            if (!monitor) return;
+            const layer = new St.Widget({ reactive: true, x: monitor.x, y: monitor.y, width: monitor.width, height: monitor.height });
+            layer.set_style("background-color: rgba(0,0,0,0.35);");
+            layer.connect("button-press-event", () => { this._hideCheat(); return Clutter.EVENT_STOP; });
+            const box = new St.BoxLayout({ vertical: true, reactive: true });
+            box.set_style("background-color: rgba(16,20,24,0.96); color: rgb(236,240,241); " +
+                "padding: 18px 22px; border-radius: 14px; border: 2px solid rgb(0,255,204);");
+            box.connect("button-press-event", () => Clutter.EVENT_STOP);
+            const title = new St.Label({ text: "MintyWM" });
+            title.set_style("font-weight: bold; font-size: 16px; padding-bottom: 8px;");
+            box.add_child(title);
+            const hint = new St.Label({ text: "Press the cheat-sheet key again, or Escape, to close." });
+            hint.set_style("font-size: 12px; color: rgb(170,180,190); padding-bottom: 10px;");
+            box.add_child(hint);
+            const body = new St.Label({ text: this._keyRows().map((r) => r.keys + "    " + r.action).join("\n") });
+            body.set_style("font-family: monospace; font-size: 13px;");
+            box.add_child(body);
+            layer.add_child(box);
+            Main.uiGroup.add_child(layer);
+            // Centre after the box knows its size. A second layout pass is enough.
+            this._later(30, () => {
+                try {
+                    const w = box.get_width();
+                    const h = box.get_height();
+                    box.set_position(Math.round((monitor.width - w) / 2), Math.round((monitor.height - h) / 2));
+                } catch (e) {}
+            });
+            this._cheat = layer;
+            this._cheatKey = global.stage.connect("key-press-event", (actor, event) => {
+                try {
+                    if (event.get_key_symbol() === Clutter.KEY_Escape) {
+                        this._hideCheat();
+                        return Clutter.EVENT_STOP;
+                    }
+                } catch (e) {}
+                return Clutter.EVENT_PROPAGATE;
+            });
+        } catch (e) {
+            global.logError(e);
+        }
     }
 
     // ----- floating windows on top -----------------------------------------
@@ -950,7 +1105,7 @@ class MintyWM {
         }
     }
 
-    // Super+Shift+F: put the focused window's app on the floating list, or take it off again.
+    // Super+Shift+T: put the focused window's app on the floating list, or take it off again.
     alwaysFloat() {
         const win = global.display.focus_window;
         if (!win || !this._known.has(win)) return;
@@ -1061,6 +1216,9 @@ class MintyWM {
         this._minSize.delete(win);
         this._overflow.delete(win);
         this._cells.delete(win);
+        this._reinsert.delete(win);
+        this._wids.delete(win);
+        this._hidden.delete(win);
         this._winConns.delete(win);  // window is being destroyed; nothing to disconnect
         this._dropBorder(win);
         if (this._lastFocus === win) this._lastFocus = null;
@@ -1071,6 +1229,7 @@ class MintyWM {
         const i = this._order.indexOf(win);
         if (i >= 0) this._order.splice(i, 1);
         this._order.push(win);
+        this._reinsert.add(win);
     }
 
     // ----- tiling ----------------------------------------------------------
@@ -1156,18 +1315,111 @@ class MintyWM {
             tiled: c.tiled,
             floating: c.floating,
             overflow: c.overflow,
+            mode: this._modeHere(),
         };
     }
 
+    _modeHere() {
+        try {
+            const ws = global.workspace_manager.get_active_workspace();
+            const mon = global.display.get_current_monitor();
+            return this._modes[(ws.index() + 1) + ":" + mon] || "tile";
+        } catch (e) {
+            return "tile";
+        }
+    }
+
+    // Fullscreen windows stay in the tree so leaving fullscreen does not
+    // throw them to the back, but they are not moved while fullscreen.
+    _inTree(win, workspace) {
+        try {
+            if (this._floating.has(win)) return false;
+            if (win.is_fullscreen() && !win.minimized &&
+                win.window_type === Meta.WindowType.NORMAL &&
+                !win.get_transient_for() &&
+                (win.is_on_all_workspaces() || win.located_on_workspace(workspace))) return true;
+        } catch (e) {
+            return false;
+        }
+        return this._eligible(win, workspace);
+    }
+
+    _isTerminal(win) {
+        const id = this._winIdentity(win);
+        const c = ((id && (id.cls || id.inst)) || "").toLowerCase();
+        return c.indexOf("terminal") >= 0 || c.indexOf("kitty") >= 0 || c.indexOf("alacritty") >= 0 ||
+            c.indexOf("wezterm") >= 0 || c.indexOf("tilix") >= 0 || c.indexOf("konsole") >= 0 ||
+            c.indexOf("xterm") >= 0 || c.indexOf("blackbox") >= 0 || c === "kgx" || c.indexOf("foot") >= 0;
+    }
+
+    _hideActor(win) {
+        try {
+            const actor = win.get_compositor_private();
+            if (!actor) return;
+            actor.hide();
+            this._hidden.add(win);
+        } catch (e) {}
+    }
+
+    _unhideAll() {
+        for (const win of [...this._hidden]) {
+            try {
+                const actor = win.get_compositor_private();
+                if (actor) actor.show();
+            } catch (e) {}
+        }
+        this._hidden.clear();
+    }
+
+    _reconcileTree(key, wins, area) {
+        const ids = wins.map((w) => this._wid(w));
+        const reinsert = [];
+        for (const w of wins) {
+            if (this._reinsert.has(w)) {
+                reinsert.push(this._wid(w));
+                this._reinsert.delete(w);
+            }
+        }
+        let tree = this._trees[key] || null;
+        if (!tree && !this._usedSave[key]) {
+            this._usedSave[key] = true;
+            const saved = CONFIG.layoutTrees && CONFIG.layoutTrees[key];
+            const assigned = saved ? ML.assignLeaves(saved, ids) : null;
+            if (assigned) tree = assigned;
+        }
+        const fresh = !tree;
+        const focus = global.display.focus_window;
+        const focusId = focus && wins.indexOf(focus) >= 0 ? this._wid(focus) : null;
+        tree = ML.reconcile(tree, ids, {
+            area: area,
+            inner: CONFIG.innerGap,
+            outer: CONFIG.outerGap,
+            focusId: focusId,
+            reinsert: reinsert,
+        });
+        if (fresh) {
+            const ratios = CONFIG.splitRatios && CONFIG.splitRatios[key];
+            const hasTree = CONFIG.layoutTrees && CONFIG.layoutTrees[key];
+            if (!hasTree && Array.isArray(ratios) && ratios.length) tree = ML.applyRatios(tree, ratios);
+        }
+        this._trees[key] = tree;
+        return tree;
+    }
+
     _retile() {
+        if (!ML) {
+            global.logWarning("MintyWM: layout engine failed to load");
+            return;
+        }
         this._targets.clear();   // checks still pending from an earlier pass are out of date
         this._overflow.clear();
         this._cells.clear();
+        this._unhideAll();
         for (const win of this._order) this._applyRule(win);
         this._syncAbove();
         const workspace = global.workspace_manager.get_active_workspace();
         if (!this._tilingHere(workspace)) {
-            this._refreshBorders();   // nothing to tile here; this just clears the borders
+            this._refreshBorders();
             this._stuckCheck(0);
             this._changed();
             this._debugLog();
@@ -1175,7 +1427,7 @@ class MintyWM {
         }
         const byMonitor = new Map();
         for (const win of this._order) {
-            if (!this._eligible(win, workspace)) continue;
+            if (!this._inTree(win, workspace)) continue;
             const mon = win.get_monitor();
             if (!byMonitor.has(mon)) byMonitor.set(mon, []);
             byMonitor.get(mon).push(win);
@@ -1184,22 +1436,58 @@ class MintyWM {
         for (const [mon, wins] of byMonitor) {
             let area;
             try { area = this._workArea(workspace, mon, wins[0]); } catch (e) { continue; }
-            // Too many windows for the screen: tile the first n, leave the rest alone
-            // (they get the floating border so it is clear they are not in the layout).
             const key = (workspace.index() + 1) + ":" + mon;
-            const ratios = this._ratiosFor(key);
-            const mins = wins.map((w) => this._minSize.get(w) || null);
-            const n = fitCount(area, wins.length, CONFIG.innerGap, CONFIG.outerGap,
-                               CONFIG.minTileWidth, CONFIG.minTileHeight, mins, ratios);
-            const plan = dwindlePlan(area, n, CONFIG.innerGap, CONFIG.outerGap, ratios);
-            for (let i = 0; i < n; i++) {
-                this._cells.set(wins[i], { index: i, count: n, cell: plan.cells[i], splits: plan.splits, ratios, key, area });
-                if (this._place(wins[i], plan.cells[i])) grew = true;
+            const members = wins.filter((w) => {
+                try { return !w.is_fullscreen(); } catch (e) { return true; }
+            });
+            const tree = this._reconcileTree(key, wins, area);
+            const mode = this._modes[key];
+            if ((mode === "monocle" || mode === "max") && members.length) {
+                const focus = global.display.focus_window;
+                const main = members.indexOf(focus) >= 0 ? focus : members[0];
+                const rect = mode === "max"
+                    ? { x: area.x, y: area.y, width: area.width, height: area.height }
+                    : ML.soleRect(area, CONFIG.innerGap, CONFIG.outerGap);
+                this._cells.set(main, { key: key, area: area, rect: rect, chain: [], id: this._wid(main) });
+                if (this._place(main, rect, area)) grew = true;
+                for (const w of members) if (w !== main) this._hideActor(w);
+                continue;
             }
-            for (let i = n; i < wins.length; i++) this._overflow.add(wins[i]);
+            const priority = members.map((w) => this._wid(w));
+            const mins = {};
+            for (const w of members) {
+                const m = this._minSize.get(w);
+                if (m) mins[this._wid(w)] = m;
+            }
+            let geometry = tree;
+            for (const w of wins) {
+                try {
+                    if (w.is_fullscreen()) geometry = ML.removeId(geometry, this._wid(w));
+                } catch (e) {}
+            }
+            if (!geometry) continue;
+            const solved = ML.solve(geometry, area, CONFIG.innerGap, CONFIG.outerGap,
+                CONFIG.minTileWidth, CONFIG.minTileHeight, mins, priority);
+            const byId = new Map(members.map((w) => [this._wid(w), w]));
+            for (const cell of solved.cells) {
+                const win = byId.get(cell.id);
+                if (!win) continue;
+                let rect = cell.rect;
+                if (cell.pseudo) rect = ML.pseudoRect(rect, CONFIG.floatSizePercent);
+                this._cells.set(win, { key: key, area: area, rect: rect, chain: cell.chain || [], id: cell.id });
+                if (this._place(win, rect, area)) grew = true;
+            }
+            solved.overflow.forEach((id, i) => {
+                const win = byId.get(id);
+                if (!win) return;
+                this._overflow.add(win);
+                const park = ML.cascadeRect(area, i, CONFIG.floatSizePercent);
+                this._cells.set(win, { key: key, area: area, rect: park, chain: [], id: id });
+                this._place(win, park, area);
+            });
         }
         this._refreshBorders();
-        this._afterPlace(0);   // check positions and borders once the windows have really moved
+        this._afterPlace(0);
         if (grew) this._settle();   // a window refused to shrink: lay out again around its real size
         this._stuckCheck(0);
         this._changed();
@@ -1224,7 +1512,7 @@ class MintyWM {
 
     // Returns true when the window turned out to be bigger than its tile, i.e. it has
     // a minimum size we did not know about, so the layout should be worked out again.
-    _place(win, r) {
+    _place(win, r, area) {
         try {
             this._untile(win);
             if (win.get_maximized()) win.unmaximize(Meta.MaximizeFlags.BOTH);
@@ -1232,14 +1520,40 @@ class MintyWM {
             if (!this._saved.has(win)) {
                 this._saved.set(win, { x: f.x, y: f.y, width: f.width, height: f.height });
             }
-            if (f.x === r.x && f.y === r.y && f.width === r.width && f.height === r.height) {
-                this._targets.set(win, { x: r.x, y: r.y, tries: 3 });
+            const rect = {
+                x: Math.round(r.x),
+                y: Math.round(r.y),
+                width: Math.max(1, Math.round(r.width)),
+                height: Math.max(1, Math.round(r.height)),
+            };
+            if (f.x === rect.x && f.y === rect.y && f.width === rect.width && f.height === rect.height) {
+                this._targets.set(win, { x: rect.x, y: rect.y, tries: 3 });
                 return false;
             }
-            win.move_resize_frame(true, r.x, r.y, r.width, r.height);
+            win.move_resize_frame(true, rect.x, rect.y, rect.width, rect.height);
+            const grew = this._noteMinSize(win, f, rect);
+            let tx = rect.x;
+            let ty = rect.y;
+            if (area && ML) {
+                const now = win.get_frame_rect();
+                const outside = now.x < area.x - 1 || now.y < area.y - 1 ||
+                    now.x + now.width > area.x + area.width + 1 ||
+                    now.y + now.height > area.y + area.height + 1;
+                const clamped = ML.clampOrigin(now, area);
+                if (clamped.x !== now.x || clamped.y !== now.y) {
+                    try { win.move_frame(true, clamped.x, clamped.y); } catch (e) {}
+                    tx = clamped.x;
+                    ty = clamped.y;
+                }
+                if (outside && CONFIG.debug) {
+                    const id = this._winIdentity(win);
+                    global.log("MintyWM: clamped " + ((id && id.cls) || "window") +
+                        " back inside the work area (" + now.width + "x" + now.height + ")");
+                }
+            }
             // Set after the request, so the window's own move signal during it is ignored.
-            this._targets.set(win, { x: r.x, y: r.y, tries: 3 });
-            return this._noteMinSize(win, f, r);
+            this._targets.set(win, { x: tx, y: ty, tries: 3 });
+            return grew;
         } catch (e) {
             global.logError(e);
             return false;
@@ -1494,12 +1808,13 @@ class MintyWM {
         }
     }
 
-    // Round 0, a second after a layout pass: look for pictures in the wrong place.
-    // Round 1, a moment later: still wrong (so not an animation)? Nudge those windows.
+    // Round 0, shortly after a layout pass: look for pictures in the wrong place.
+    // Round 1: still wrong? Nudge ordinary windows; snap terminals (a 1px nudge
+    // grows them by a whole character cell and can push them off a 1080p screen).
     // Round 2: still wrong? Move the picture ourselves.
     _stuckCheck(round) {
         if (this._stuckId) this._cancel(this._stuckId);
-        this._stuckId = this._later(round === 0 ? 1000 : 400, () => {
+        this._stuckId = this._later(round === 0 ? 250 : 300, () => {
             this._stuckId = 0;
             const off = this._visibleHere().filter((win) => this._pictureOff(win));
             if (!off.length) return;
@@ -1509,10 +1824,11 @@ class MintyWM {
             }
             for (const win of off) {
                 const id = this._winIdentity(win) || { cls: "?" };
+                const snap = round >= 2 || this._isTerminal(win);
                 global.log("MintyWM: picture of " + (id.cls || "?") + " is drawn away from the window; " +
-                    (round === 1 ? "asking it to redraw" : "moving the picture"));
-                if (round === 1) this._nudge(win);
-                else this._snapPicture(win);
+                    (snap ? "moving the picture" : "asking it to redraw"));
+                if (snap) this._snapPicture(win);
+                else this._nudge(win);
             }
             if (round === 1) this._stuckCheck(2);
         });
@@ -1527,8 +1843,8 @@ class MintyWM {
         const lines = ["MintyWM: tiling " + (this._tilingOn ? "on" : "paused everywhere") +
             "; workspace " + n + (this._noTile.has(n) ? " is excluded" : "") +
             "; excluded list: [" + formatWorkspaceList(this._noTile) + "]" +
-            "; sizes: " + JSON.stringify(Object.keys(this._splits).filter((k) => k.startsWith(n + ":"))
-                .reduce((o, k) => { o[k] = this._splits[k]; return o; }, {}))];
+            "; trees: " + JSON.stringify(Object.keys(this._trees).filter((k) => k.startsWith(n + ":"))) +
+            "; mode: " + this._modeHere()];
         for (const win of this._order) {
             let line;
             try {
@@ -1620,7 +1936,14 @@ class MintyWM {
 
 let app = null;
 
-function init(metadata) {}
+function init(metadata) {
+    try {
+        loadLayout(metadata.path);
+    } catch (e) {
+        global.logError("MintyWM: could not load mintyLayout.js");
+        global.logError(e);
+    }
+}
 
 function enable() {
     app = new MintyWM();

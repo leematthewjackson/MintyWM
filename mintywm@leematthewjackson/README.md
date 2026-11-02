@@ -16,16 +16,15 @@ needs this extension.
 
 | Keys | Action |
 |---|---|
-| Super+T | pause / resume tiling everywhere |
-| Super+Alt+T | tiling on / off for the current workspace |
-| Super+Shift+T | re-tile everything now |
-| Super+F | float / tile the focused window |
-| Super+J / Super+K | focus next / previous window |
-| Super+Shift+J / K | swap with next / previous tile |
-| Super+Shift+H | move to the first (left) slot |
-| Super+Shift+F | always float this app (press again to undo) |
-| Super+L / Super+H | make the focused tile bigger / smaller (or drag its edge) |
-| Super+= | even tile sizes again on this workspace |
+| Ctrl+Super+arrows / Ctrl+Super+Shift+arrows | focus / swap. Super+arrows stays with Cinnamon |
+| Super+T | float / tile |
+| Super+Shift+T | always float this app, or stop |
+| Super+F | fullscreen |
+| Super+J | toggle split direction |
+| Ctrl+Super+/ | cheat sheet |
+| Super+Ctrl+T | pause or resume tiling everywhere |
+
+Change any of them under **Keyboard**.
 
 ## Floating apps
 
@@ -33,11 +32,11 @@ Some windows should never be tiled. MintyWM ships with Cinnamon's own settings w
 (System Settings, and the applet / extension / desklet settings) set to open floating.
 Manage the list in the settings, on the **Floating apps** page.
 
-- Easiest: click a window and press **Super+Shift+F**. Press again to undo.
+- Easiest: click a window and press **Super+Shift+T**. Press again to undo.
 - Or find a window's class: run `xprop WM_CLASS` in a terminal, click the window, and use the
   first name in quotes.
 - `*` matches anything, capitals are ignored. "Title contains" is optional.
-- Untick a row to turn it off, or delete it. **Super+F** on one window tiles just that window.
+- Untick a row to turn it off, or delete it. **Super+T** on one window tiles just that window.
 - Floating windows are kept on top of the tiles so they don't get lost (switch in the settings).
 
 ## Workspaces

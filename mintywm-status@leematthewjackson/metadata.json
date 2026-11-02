@@ -1,8 +1,8 @@
 {
     "uuid": "mintywm-status@leematthewjackson",
     "name": "MintyWM Status",
-    "description": "Panel indicator for the MintyWM tiling extension: shows whether tiling is on for the current workspace and how many windows are tiled; click to toggle. Requires the MintyWM extension to be installed and enabled.",
-    "version": "0.7",
+    "description": "Panel indicator for MintyWM. The icon shows tiling, paused, or off on this workspace. The count is tiled windows, plus any that didn't fit. Click for controls and keys.",
+    "version": "0.8",
     "author": "Lee Matthew Jackson",
     "website": "https://leematthewjackson.com",
     "url": "https://github.com/leematthewjackson/MintyWM",

@@ -1,8 +1,8 @@
 {
     "uuid": "mintywm@leematthewjackson",
     "name": "MintyWM",
-    "description": "Dynamic Tiling Window Management for Cinnamon. Hyprland-style dwindle auto-tiling, per-window float, focus and swap keys, a thin focus/float keyline border, and a list of apps that always open floating (Cinnamon's own settings windows and a few tool windows by default). Configure it with the gear button.",
-    "version": "0.9",
+    "description": "Dynamic tiling for Cinnamon. Dwindle split tree, Hyprland-style keys, and windows kept on screen at 1080p.",
+    "version": "0.10",
     "author": "Lee Matthew Jackson",
     "website": "https://leematthewjackson.com",
     "url": "https://github.com/leematthewjackson/MintyWM",

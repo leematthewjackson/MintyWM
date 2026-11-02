@@ -29,8 +29,8 @@ Look at my "rice" :D
 
 | Folder | What it is | Version |
 |---|---|---|
-| `mintywm@leematthewjackson/` | **The extension.** This is MintyWM itself, with its own settings panel. | 0.9 |
-| `mintywm-status@leematthewjackson/` | **Optional panel applet.** Shows tiling status and the window count. It is separate and not bundled. It **requires the extension** and does nothing without it. | 0.7 |
+| `mintywm@leematthewjackson/` | **The extension.** This is MintyWM itself, with its own settings panel. | 0.10 |
+| `mintywm-status@leematthewjackson/` | **Optional panel applet.** Shows tiling status and the window count. It is separate and not bundled. It **requires the extension** and does nothing without it. | 0.8 |
 
 The applet is separate because Cinnamon extensions and applets are installed and enabled independently.
 
@@ -38,18 +38,23 @@ The applet is separate because Cinnamon extensions and applets are installed and
 
 ## Features
 
-- **Dwindle auto-tiling.** Each new window splits the space left by the previous one, alternating direction.
-- **Automatic refill.** Closing or minimising a window re-tiles the rest.
+- **Dwindle auto-tiling.** Each new window splits the focused tile. The split direction is remembered, so it does not flip just because a rectangle goes square.
+- **Automatic refill.** Closing or minimising a window re-tiles the rest and keeps the other splits.
+- **Directional focus.** Ctrl+Super+arrows moves to the window in that direction. Ctrl+Super+Shift+arrows swaps with it. Super+arrows stays with Cinnamon's own snapping.
+- **One key set.** The letter keys follow Hyprland and Omarchy (Super+T floats, Super+F is fullscreen, Super+J toggles the split). The cheat sheet is Ctrl+Super+/. Change any of them under Keyboard.
+- **Kept on screen.** Windows that cannot shrink small enough are parked on the work area instead of being left past the edge. Handy on a 1080p display. New installs use 8px gaps; if you already saved 30px gaps, set them back yourself.
 - **Float any window.** Pop a window out of the layout with one key and put it back later. It returns to its previous size and position.
 - **Always-float apps.** Keep chosen apps floating by default, edited from the settings panel. Cinnamon's own settings windows are in the list by default.
 - **Floating windows stay on top** (optional, on by default), so they don't get lost behind tiled windows.
 - **Per-workspace switch.** Turn tiling off on specific workspaces (say 4 and 9) and keep it everywhere else.
-- **Keyboard navigation.** Cycle focus, swap windows and promote a window to the first slot.
-- **Resizable tiles.** Grow or shrink a tile with the keyboard or by dragging its edge. Sizes are kept per workspace.
+- **Keyboard navigation.** Ctrl+Super+arrows move by direction. Ctrl+Super+Shift+arrows swap.
+- **Resizable tiles.** Grow or shrink a tile on one axis, or drag an edge. A diagonal drag keeps both edges. Sizes are kept per workspace.
+- **Fullscreen, fill, and monocle.** Real fullscreen, fill the work area with the panels still visible, or show one window and keep the gaps.
+- **Pseudotile and pop-out.** Super+P keeps a smaller size inside the tile. Super+O floats the window and pins it above the tiles.
 - **Focus and float borders.** A thin luminous border marks the focused window (mint) and floating windows (magenta). Colours, width and corner radius are configurable, with each corner settable separately.
-- **Gaps and minimum sizes.** Inner and outer gaps. When too many windows would make tiles smaller than the minimum, the extras are left out of the layout (with the floating border, so you can see which) instead of becoming unusable slivers. Apps that refuse to shrink below their own minimum size get a bigger tile.
+- **Gaps and minimum sizes.** Inner and outer gaps. Gaps shrink before a window is refused. Extras are parked on screen (magenta border) instead of being left wherever they last were. Apps that refuse to shrink below their own minimum size get a bigger tile.
 - **Settings panel built in.** Changes apply live, with no restart.
-- **Status applet** (optional). Shows *on / off* and the number of tiled windows. Click to pause or resume tiling, middle-click for the current workspace only.
+- **Status applet** (optional). Three icons: tiling, paused everywhere, or off on this workspace. The count is how many windows are tiled, and `3+1` means one was parked. Click opens controls and the live key list. Middle-click still toggles this workspace.
 
 ---
 
@@ -109,27 +114,34 @@ rm -rf ~/.local/share/cinnamon/applets/mintywm-status@leematthewjackson
 
 ## Keyboard shortcuts
 
-All shortcuts can be changed in the extension's settings under **Keyboard**.
+One set, close to Hyprland and Omarchy. Every shortcut can be changed under **Keyboard**. If Cinnamon already owns a shortcut, that one binding is skipped and a warning is written to the Cinnamon log.
+
+Ctrl+Super+arrows move focus. Ctrl+Super+Shift+arrows swap. Super+arrows is left for Cinnamon's window snapping.
 
 | Keys | Action |
 |---|---|
-| **Super + T** | Pause or resume tiling everywhere |
-| **Super + Alt + T** | Turn tiling on or off for the **current workspace** |
-| **Super + Shift + T** | Re-tile everything now. This also turns tiling back on if it was off, here or everywhere, in one press. |
-| **Super + F** | Float or tile the focused window |
-| **Super + Shift + F** | Always float this app (or stop always floating it) |
-| **Super + J** | Focus the next window |
-| **Super + K** | Focus the previous window |
-| **Super + Shift + J** | Swap the focused window with the next one |
-| **Super + Shift + K** | Swap the focused window with the previous one |
-| **Super + Shift + H** | Make the focused window the first (largest) tile |
-| **Super + L** | Make the focused tile bigger (the others make room) |
-| **Super + H** | Make the focused tile smaller |
-| **Super + =** | Even tile sizes again on this workspace |
+| **Super + T** | Float or tile |
+| **Super + Shift + T** | Always float this app, or stop |
+| **Super + F** | Fullscreen |
+| **Super + Alt + F** | Fill the work area |
+| **Super + Ctrl + F** | Monocle |
+| **Super + J** | Toggle split direction |
+| **Super + P** | Pseudotile |
+| **Super + O** | Pop out and pin |
+| **Super + W** | Close the window |
+| **Ctrl + Super + /** | Cheat sheet |
+| **Super + = / -** | Wider / narrower |
+| **Super + Shift + = / -** | Taller / shorter |
+| **Super + Alt + =** | Even sizes on this workspace |
+| **Ctrl + Super + arrows** | Focus |
+| **Ctrl + Super + Shift + arrows** | Swap |
+| **Super + Ctrl + T** | Pause or resume tiling everywhere |
+| **Super + Alt + T** | This workspace only |
+| **Super + Shift + R** | Re-tile now |
 
-Focus cycling goes round in a loop, and Cinnamon's own Alt+Tab is untouched.
+Cinnamon still owns Super+arrow snapping, workspace switching (Ctrl+Alt+arrows) and Alt+Tab. MintyWM does not take those.
 
-**Resizing tiles.** Press **Super + L** / **Super + H**, or drag the edge of a tile with the mouse (or use Alt+F8). The tiles next to it make room. Sizes are remembered per workspace, also after a restart. **Super + =** evens out the workspace you're on; *Tiling → Window sizes* has a button that resets every workspace, and the applet's right-click menu has *Reset tile sizes on this workspace*. Dragging a tile without changing its size snaps it back into place.
+**Resizing.** Drag a tile's edge, or use the resize keys. The other tiles make room. Sizes are remembered per workspace. The status applet's menu, and *Tiling → Window sizes*, can reset them.
 
 ---
 
@@ -137,8 +149,8 @@ Focus cycling goes round in a loop, and Cinnamon's own Alt+Tab is untouched.
 
 ### Floating windows
 
-- **Super + F** toggles a single window out of or back into the layout. It remembers where the window was and puts it back there.
-- **Super + Shift + F** makes it permanent for that *app*: the app's window class is added to your *Floating apps* list and it floats from then on. Press it again to remove the rule.
+- **Super + T** toggles a single window out of or back into the layout. It remembers where the window was and puts it back there.
+- **Super + Shift + T** makes it permanent for that *app*: the app's window class is added to your *Floating apps* list and it floats from then on. Press it again to remove the rule.
 
 ### Floating apps list
 
@@ -158,7 +170,7 @@ Defaults: `cinnamon-settings*` and `xlet-settings*`, so Cinnamon's settings and 
 xprop WM_CLASS
 ```
 
-The output looks like `WM_CLASS(STRING) = "instance", "ClassName"`. Either part works as a rule. Or just focus the window and press **Super + Shift + F**.
+The output looks like `WM_CLASS(STRING) = "instance", "ClassName"`. Either part works as a rule. Or just focus the window and press **Super + Shift + T**.
 
 <img width="1079" height="1003" alt="image" src="https://github.com/user-attachments/assets/f6e57040-0e68-4cdf-b6ac-2af0baa88754" />
 
@@ -243,7 +255,7 @@ Open **System Settings → Extensions → MintyWM → Configure** (the gear icon
 
 **A window is drawn in the wrong place** (an empty tile, or an app's content showing in another tile). Some apps, mostly Chromium and Electron ones, sometimes don't redraw after being moved, so their picture stays where it was. MintyWM checks for this after every layout change and fixes it on its own. **Super + Shift + T** forces every window to redraw. `global.mintywm.dump()` marks such windows with `PICTURE STUCK`.
 
-**A window I drag snaps back.** Tiled windows return to their tile when you let go. Float it first (**Super + F**) to move it freely.
+**A window I drag snaps back.** Tiled windows return to their tile when you let go. Float it first (**Super + T**) to move it freely.
 
 ---
 

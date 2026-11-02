@@ -2,7 +2,7 @@
     "showLabel": {
         "type": "switch",
         "default": true,
-        "description": "Show the window count (or \"off\") next to the icon"
+        "description": "Show the count next to the icon (3, 3+1 if some didn't fit, off, or ws)"
     },
     "iconStyle": {
         "type": "combobox",

@@ -39,7 +39,7 @@
             "title": "Keyboard",
             "sections": [
                 "sec-keys-modes",
-                "sec-keys-focus",
+                "sec-keys-direction",
                 "sec-keys-resize"
             ]
         },
@@ -113,22 +113,20 @@
             "type": "section",
             "title": "Tiling and floating",
             "keys": [
+                "keysHelp",
                 "keyToggleTiling",
                 "keyToggleWorkspace",
                 "keyToggleFloat",
                 "keyAlwaysFloat",
-                "keyRetile"
-            ]
-        },
-        "sec-keys-focus": {
-            "type": "section",
-            "title": "Focus and arrangement",
-            "keys": [
-                "keyFocusNext",
-                "keyFocusPrev",
-                "keySwapNext",
-                "keySwapPrev",
-                "keyMakeFirst"
+                "keyPop",
+                "keyFullscreen",
+                "keyMaximize",
+                "keyMonocle",
+                "keyToggleSplit",
+                "keyPseudo",
+                "keyClose",
+                "keyRetile",
+                "keyCheatSheet"
             ]
         },
         "sec-about": {
@@ -163,15 +161,31 @@
             "type": "section",
             "title": "Tile sizes",
             "keys": [
-                "keyGrow",
-                "keyShrink",
+                "keyGrowWidth",
+                "keyShrinkWidth",
+                "keyGrowHeight",
+                "keyShrinkHeight",
                 "keyResetSizes"
+            ]
+        },
+        "sec-keys-direction": {
+            "type": "section",
+            "title": "Direction (Hyprland / Omarchy)",
+            "keys": [
+                "keyFocusLeft",
+                "keyFocusRight",
+                "keyFocusUp",
+                "keyFocusDown",
+                "keySwapLeft",
+                "keySwapRight",
+                "keySwapUp",
+                "keySwapDown"
             ]
         }
     },
     "innerGap": {
         "type": "spinbutton",
-        "default": 30,
+        "default": 8,
         "min": 0,
         "max": 64,
         "step": 1,
@@ -180,7 +194,7 @@
     },
     "outerGap": {
         "type": "spinbutton",
-        "default": 30,
+        "default": 8,
         "min": 0,
         "max": 64,
         "step": 1,
@@ -196,7 +210,7 @@
         "step": 10,
         "units": "px",
         "description": "Smallest tile width",
-        "tooltip": "When more windows are open than fit, the extra ones are left where they are. 0 means no limit."
+        "tooltip": "When more windows are open than fit, the extra ones are parked on screen as floating windows. 0 means no limit."
     },
     "minTileHeight": {
         "type": "spinbutton",
@@ -206,7 +220,7 @@
         "step": 10,
         "units": "px",
         "description": "Smallest tile height",
-        "tooltip": "When more windows are open than fit, the extra ones are left where they are. 0 means no limit."
+        "tooltip": "When more windows are open than fit, the extra ones are parked on screen as floating windows. 0 means no limit."
     },
     "floatSizePercent": {
         "type": "spinbutton",
@@ -316,43 +330,18 @@
     },
     "keyToggleTiling": {
         "type": "keybinding",
-        "default": "<Super>t",
+        "default": "<Super><Control>t",
         "description": "Pause or resume tiling everywhere"
     },
     "keyToggleFloat": {
         "type": "keybinding",
-        "default": "<Super>f",
+        "default": "<Super>t",
         "description": "Float or tile the focused window"
     },
     "keyRetile": {
         "type": "keybinding",
-        "default": "<Super><Shift>t",
+        "default": "<Super><Shift>r",
         "description": "Re-tile everything now"
-    },
-    "keyFocusNext": {
-        "type": "keybinding",
-        "default": "<Super>j",
-        "description": "Focus the next window"
-    },
-    "keyFocusPrev": {
-        "type": "keybinding",
-        "default": "<Super>k",
-        "description": "Focus the previous window"
-    },
-    "keySwapNext": {
-        "type": "keybinding",
-        "default": "<Super><Shift>j",
-        "description": "Swap the focused tile with the next one"
-    },
-    "keySwapPrev": {
-        "type": "keybinding",
-        "default": "<Super><Shift>k",
-        "description": "Swap the focused tile with the previous one"
-    },
-    "keyMakeFirst": {
-        "type": "keybinding",
-        "default": "<Super><Shift>h",
-        "description": "Move the focused window to the first (big, left) slot"
     },
     "aboutName": {
         "type": "label",
@@ -376,7 +365,7 @@
     },
     "floatHelp2": {
         "type": "label",
-        "description": "Easiest way to add an app: click its window and press Super+Shift+F. Press it again to undo."
+        "description": "Easiest way to add an app: click its window and press Super+Shift+T. Press it again to undo."
     },
     "floatHelp3": {
         "type": "label",
@@ -388,7 +377,7 @@
     },
     "floatHelp5": {
         "type": "label",
-        "description": "Title contains is optional: leave it empty to float every window of that app. Super+F on one window tiles just that window and leaves this list alone."
+        "description": "Title contains is optional: leave it empty to float every window of that app. Super+T on one window tiles just that window and leaves this list alone."
     },
     "floatRules": {
         "type": "list",
@@ -443,7 +432,7 @@
     },
     "keyAlwaysFloat": {
         "type": "keybinding",
-        "default": "<Super><Shift>f",
+        "default": "<Super><Shift>t",
         "description": "Always float (or stop floating) the focused window's app"
     },
     "floatOnTop": {
@@ -467,24 +456,14 @@
         "default": "<Super><Alt>t",
         "description": "Turn tiling on or off for this workspace"
     },
-    "keyGrow": {
-        "type": "keybinding",
-        "default": "<Super>l",
-        "description": "Make the focused tile bigger"
-    },
-    "keyShrink": {
-        "type": "keybinding",
-        "default": "<Super>h",
-        "description": "Make the focused tile smaller"
-    },
     "keyResetSizes": {
         "type": "keybinding",
-        "default": "<Super>equal",
+        "default": "<Super><Alt>equal",
         "description": "Even tile sizes again on this workspace"
     },
     "resizeHelp": {
         "type": "label",
-        "description": "Resize a tile with Super+L / Super+H, or drag its edge with the mouse. The other tiles make room. Sizes are kept per workspace."
+        "description": "Resize with the keys below, or drag a tile's edge. Split direction stays until you toggle it. Sizes are kept per workspace."
     },
     "resizeStep": {
         "type": "spinbutton",
@@ -504,5 +483,113 @@
     "splitRatios": {
         "type": "generic",
         "default": {}
+    },
+    "keyPop": {
+        "type": "keybinding",
+        "default": "<Super>o",
+        "description": "Pop the focused window out and pin it"
+    },
+    "keyFullscreen": {
+        "type": "keybinding",
+        "default": "<Super>f",
+        "description": "Fullscreen"
+    },
+    "keyMaximize": {
+        "type": "keybinding",
+        "default": "<Super><Alt>f",
+        "description": "Fill the work area (panels stay visible)"
+    },
+    "keyMonocle": {
+        "type": "keybinding",
+        "default": "<Super><Control>f",
+        "description": "Monocle: one window, gaps kept"
+    },
+    "keyToggleSplit": {
+        "type": "keybinding",
+        "default": "<Super>j",
+        "description": "Toggle split direction"
+    },
+    "keyPseudo": {
+        "type": "keybinding",
+        "default": "<Super>p",
+        "description": "Pseudotile: keep a floating size inside the tile"
+    },
+    "keyClose": {
+        "type": "keybinding",
+        "default": "<Super>w",
+        "description": "Close the focused window"
+    },
+    "keyFocusLeft": {
+        "type": "keybinding",
+        "default": "<Super><Control>Left",
+        "description": "Focus the window to the left"
+    },
+    "keyFocusRight": {
+        "type": "keybinding",
+        "default": "<Super><Control>Right",
+        "description": "Focus the window to the right"
+    },
+    "keyFocusUp": {
+        "type": "keybinding",
+        "default": "<Super><Control>Up",
+        "description": "Focus the window above"
+    },
+    "keyFocusDown": {
+        "type": "keybinding",
+        "default": "<Super><Control>Down",
+        "description": "Focus the window below"
+    },
+    "keySwapLeft": {
+        "type": "keybinding",
+        "default": "<Super><Control><Shift>Left",
+        "description": "Swap with the window to the left"
+    },
+    "keySwapRight": {
+        "type": "keybinding",
+        "default": "<Super><Control><Shift>Right",
+        "description": "Swap with the window to the right"
+    },
+    "keySwapUp": {
+        "type": "keybinding",
+        "default": "<Super><Control><Shift>Up",
+        "description": "Swap with the window above"
+    },
+    "keySwapDown": {
+        "type": "keybinding",
+        "default": "<Super><Control><Shift>Down",
+        "description": "Swap with the window below"
+    },
+    "keyGrowWidth": {
+        "type": "keybinding",
+        "default": "<Super>equal",
+        "description": "Make the focused tile wider"
+    },
+    "keyShrinkWidth": {
+        "type": "keybinding",
+        "default": "<Super>minus",
+        "description": "Make the focused tile narrower"
+    },
+    "keyGrowHeight": {
+        "type": "keybinding",
+        "default": "<Super><Shift>equal",
+        "description": "Make the focused tile taller"
+    },
+    "keyShrinkHeight": {
+        "type": "keybinding",
+        "default": "<Super><Shift>minus",
+        "description": "Make the focused tile shorter"
+    },
+    "keyCheatSheet": {
+        "type": "keybinding",
+        "default": "<Super><Control>slash",
+        "description": "Show or hide the key cheat sheet"
+    },
+    "layoutTrees": {
+        "type": "generic",
+        "default": {}
+    },
+    "keysHelp": {
+        "type": "label",
+        "description": "One set of keys, close to Hyprland and Omarchy. Change any of them here. Ctrl+Super+arrows move focus so Cinnamon keeps Super+arrow snapping. The cheat sheet is Ctrl+Super+/, because Super+/ often never arrives. The empty box beside a shortcut is an optional second binding, not a missing one. Cinnamon will refuse a shortcut it already uses."
     }
 }
