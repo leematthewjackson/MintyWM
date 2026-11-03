@@ -19,7 +19,8 @@
 //     (Super+arrows stays with Cinnamon's own snapping)
 //   - Super+T float, Super+F fullscreen, Super+J togglesplit, Ctrl+Super+/ cheat sheet
 //   - Windows that do not fit are parked on screen, never left past the edge
-//   - Super+P pseudotile, Super+O pop-out, monocle and work-area fill
+//   - Super+Shift+P pseudotile, Super+Shift+O pop-out (bare Super+P / Super+O
+//     belong to Cinnamon: monitors and orientation lock)
 // Settings: System Settings > Extensions > MintyWM > the gear button. Changes apply live.
 // The values in CONFIG below are the defaults (they must match settings-schema.json);
 // they are overwritten by whatever is saved in the settings.
@@ -48,13 +49,13 @@ const CONFIG = {
     keyRetile: "<Super><Shift>r",
     keyAlwaysFloat: "<Super><Shift>t",
     keyToggleWorkspace: "<Super><Alt>t",
-    keyResetSizes: "<Super><Alt>equal",
-    keyPop: "<Super>o",
+    keyResetSizes: "<Super><Control>equal",
+    keyPop: "<Super><Shift>o",
     keyFullscreen: "<Super>f",
     keyMaximize: "<Super><Alt>f",
     keyMonocle: "<Super><Control>f",
     keyToggleSplit: "<Super>j",
-    keyPseudo: "<Super>p",
+    keyPseudo: "<Super><Shift>p",
     keyClose: "<Super>w",
     keyFocusLeft: "<Super><Control>Left",
     keyFocusRight: "<Super><Control>Right",
@@ -462,6 +463,13 @@ class MintyWM {
         const want = ML && ML.DEFAULT_KEYS;
         if (!this._settings || !want) return;
         const oldCheat = { "<Super>k": true, "<Super>slash": true, "<Super>question": true };
+        // 0.10 shipped these. Cinnamon already owns them, so an untouched copy
+        // moves to the 1.1 default. A binding you chose yourself is left alone.
+        const clashes = {
+            keyPop: "<Super>o",                 // orientation lock
+            keyPseudo: "<Super>p",              // switch monitor configurations
+            keyResetSizes: "<Super><Alt>equal", // magnifier zoom in
+        };
         let changed = false;
         this._writingKeys = true;
         try {
@@ -471,6 +479,12 @@ class MintyWM {
                 } else if (!Object.prototype.hasOwnProperty.call(legacy, key) || CONFIG[key] !== legacy[key] || legacy[key] === want[key]) {
                     continue;
                 }
+                this._settings.setValue(key, want[key]);
+                CONFIG[key] = want[key];
+                changed = true;
+            }
+            for (const key of Object.keys(clashes)) {
+                if (CONFIG[key] !== clashes[key] || clashes[key] === want[key]) continue;
                 this._settings.setValue(key, want[key]);
                 CONFIG[key] = want[key];
                 changed = true;

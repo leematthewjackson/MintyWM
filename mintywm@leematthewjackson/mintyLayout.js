@@ -527,6 +527,8 @@ function shiftKeyMap(obj, removed, count) {
 
 // ---- default keys ----------------------------------------------------------
 // One set, Hyprland / Omarchy shaped. Super+arrows stays with Cinnamon.
+// Super+P and Super+O stay with Cinnamon too (monitors, orientation lock),
+// so pseudotile and pop-out are Super+Shift+P and Super+Shift+O.
 // The cheat sheet is Ctrl+Super+/, because Super+/ often never reaches an extension.
 
 var KEY_LABELS = [
@@ -563,12 +565,12 @@ var DEFAULT_KEYS = {
     keyToggleWorkspace: "<Super><Alt>t",
     keyToggleFloat: "<Super>t",
     keyAlwaysFloat: "<Super><Shift>t",
-    keyPop: "<Super>o",
+    keyPop: "<Super><Shift>o",
     keyFullscreen: "<Super>f",
     keyMaximize: "<Super><Alt>f",
     keyMonocle: "<Super><Control>f",
     keyToggleSplit: "<Super>j",
-    keyPseudo: "<Super>p",
+    keyPseudo: "<Super><Shift>p",
     keyClose: "<Super>w",
     keyFocusLeft: "<Super><Control>Left",
     keyFocusRight: "<Super><Control>Right",
@@ -582,7 +584,7 @@ var DEFAULT_KEYS = {
     keyShrinkWidth: "<Super>minus",
     keyGrowHeight: "<Super><Shift>equal",
     keyShrinkHeight: "<Super><Shift>minus",
-    keyResetSizes: "<Super><Alt>equal",
+    keyResetSizes: "<Super><Control>equal",
     keyRetile: "<Super><Shift>r",
     keyCheatSheet: "<Super><Control>slash",
 };

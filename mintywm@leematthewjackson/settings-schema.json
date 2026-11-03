@@ -345,7 +345,7 @@
     },
     "aboutName": {
         "type": "label",
-        "description": "MintyWM - Dynamic Tiling Window Management for Cinnamon"
+        "description": "MintyWM 1.1 RC — dynamic tiling for Cinnamon"
     },
     "aboutAuthor": {
         "type": "label",
@@ -458,7 +458,7 @@
     },
     "keyResetSizes": {
         "type": "keybinding",
-        "default": "<Super><Alt>equal",
+        "default": "<Super><Control>equal",
         "description": "Even tile sizes again on this workspace"
     },
     "resizeHelp": {
@@ -486,7 +486,7 @@
     },
     "keyPop": {
         "type": "keybinding",
-        "default": "<Super>o",
+        "default": "<Super><Shift>o",
         "description": "Pop the focused window out and pin it"
     },
     "keyFullscreen": {
@@ -511,7 +511,7 @@
     },
     "keyPseudo": {
         "type": "keybinding",
-        "default": "<Super>p",
+        "default": "<Super><Shift>p",
         "description": "Pseudotile: keep a floating size inside the tile"
     },
     "keyClose": {
@@ -590,6 +590,6 @@
     },
     "keysHelp": {
         "type": "label",
-        "description": "One set of keys, close to Hyprland and Omarchy. Change any of them here. Ctrl+Super+arrows move focus so Cinnamon keeps Super+arrow snapping. The cheat sheet is Ctrl+Super+/, because Super+/ often never arrives. The empty box beside a shortcut is an optional second binding, not a missing one. Cinnamon will refuse a shortcut it already uses."
+        "description": "One set of keys, close to Hyprland and Omarchy. Super+P and Super+O are Cinnamon's (switch monitors, orientation lock), so pseudotile and pop-out are Super+Shift+P and Super+Shift+O. Even sizes is Ctrl+Super+=, because Super+Alt+= zooms the magnifier. Ctrl+Super+arrows move focus so Cinnamon keeps Super+arrow snapping. The cheat sheet is Ctrl+Super+/, because Super+/ often never arrives. The empty box beside a shortcut is an optional second binding, not a missing one. Cinnamon will refuse a shortcut it already uses."
     }
 }

@@ -13,9 +13,12 @@ By [Lee Matthew Jackson](https://leematthewjackson.com) · Mastodon: [@leematthe
 
 ## Watch the demo
 
+> [!NOTE]
+> **This video is already out of date.** The extension has been changing quickly since it was recorded, so shortcuts and behaviour in the clip will not match the current release. Use this README (1.1 RC), not the video.
+
 [![MintyWM demo video on YouTube](https://img.youtube.com/vi/CHejYv80eo8/maxresdefault.jpg)](https://youtu.be/CHejYv80eo8)
 
-▶️ **[Watch the MintyWM demo on YouTube](https://youtu.be/CHejYv80eo8)**: auto-tiling, floating windows, shortcuts and per-workspace switching in action.
+▶️ **[Watch the MintyWM demo on YouTube](https://youtu.be/CHejYv80eo8)** for the general idea: auto-tiling, floating windows, and per-workspace switching. The keys on screen are from an earlier build.
 
 Look at my "rice" :D
 
@@ -29,8 +32,8 @@ Look at my "rice" :D
 
 | Folder | What it is | Version |
 |---|---|---|
-| `mintywm@leematthewjackson/` | **The extension.** This is MintyWM itself, with its own settings panel. | 0.10 |
-| `mintywm-status@leematthewjackson/` | **Optional panel applet.** Shows tiling status and the window count. It is separate and not bundled. It **requires the extension** and does nothing without it. | 0.8 |
+| `mintywm@leematthewjackson/` | **The extension.** This is MintyWM itself, with its own settings panel. | 1.1 RC |
+| `mintywm-status@leematthewjackson/` | **Optional panel applet.** Shows tiling status and the window count. It is separate and not bundled. It **requires the extension** and does nothing without it. | 1.1 RC |
 
 The applet is separate because Cinnamon extensions and applets are installed and enabled independently.
 
@@ -41,7 +44,7 @@ The applet is separate because Cinnamon extensions and applets are installed and
 - **Dwindle auto-tiling.** Each new window splits the focused tile. The split direction is remembered, so it does not flip just because a rectangle goes square.
 - **Automatic refill.** Closing or minimising a window re-tiles the rest and keeps the other splits.
 - **Directional focus.** Ctrl+Super+arrows moves to the window in that direction. Ctrl+Super+Shift+arrows swaps with it. Super+arrows stays with Cinnamon's own snapping.
-- **One key set.** The letter keys follow Hyprland and Omarchy (Super+T floats, Super+F is fullscreen, Super+J toggles the split). The cheat sheet is Ctrl+Super+/. Change any of them under Keyboard.
+- **One key set.** The letter keys follow Hyprland and Omarchy (Super+T floats, Super+F is fullscreen, Super+J toggles the split). Pseudotile and pop-out keep the Omarchy letters but add Shift, because Cinnamon already uses Super+P and Super+O. The cheat sheet is Ctrl+Super+/. Change any of them under Keyboard.
 - **Kept on screen.** Windows that cannot shrink small enough are parked on the work area instead of being left past the edge. Handy on a 1080p display. New installs use 8px gaps; if you already saved 30px gaps, set them back yourself.
 - **Float any window.** Pop a window out of the layout with one key and put it back later. It returns to its previous size and position.
 - **Always-float apps.** Keep chosen apps floating by default, edited from the settings panel. Cinnamon's own settings windows are in the list by default.
@@ -50,7 +53,7 @@ The applet is separate because Cinnamon extensions and applets are installed and
 - **Keyboard navigation.** Ctrl+Super+arrows move by direction. Ctrl+Super+Shift+arrows swap.
 - **Resizable tiles.** Grow or shrink a tile on one axis, or drag an edge. A diagonal drag keeps both edges. Sizes are kept per workspace.
 - **Fullscreen, fill, and monocle.** Real fullscreen, fill the work area with the panels still visible, or show one window and keep the gaps.
-- **Pseudotile and pop-out.** Super+P keeps a smaller size inside the tile. Super+O floats the window and pins it above the tiles.
+- **Pseudotile and pop-out.** Super+Shift+P keeps a smaller size inside the tile. Super+Shift+O floats the window and pins it above the tiles. Bare Super+P and Super+O stay with Cinnamon.
 - **Focus and float borders.** A thin luminous border marks the focused window (mint) and floating windows (magenta). Colours, width and corner radius are configurable, with each corner settable separately.
 - **Gaps and minimum sizes.** Inner and outer gaps. Gaps shrink before a window is refused. Extras are parked on screen (magenta border) instead of being left wherever they last were. Apps that refuse to shrink below their own minimum size get a bigger tile.
 - **Settings panel built in.** Changes apply live, with no restart.
@@ -73,8 +76,8 @@ If the two zip files are in `~/Downloads`:
 
 ```bash
 mkdir -p ~/.local/share/cinnamon/extensions ~/.local/share/cinnamon/applets
-unzip -oq ~/Downloads/mintywm-extension-0.9.zip -d ~/.local/share/cinnamon/extensions/
-unzip -oq ~/Downloads/mintywm-status-applet-0.7.zip -d ~/.local/share/cinnamon/applets/
+unzip -oq ~/Downloads/mintywm-extension-1.1-rc.zip -d ~/.local/share/cinnamon/extensions/
+unzip -oq ~/Downloads/mintywm-status-applet-1.1-rc.zip -d ~/.local/share/cinnamon/applets/
 ```
 
 ### From this repository
@@ -118,6 +121,8 @@ One set, close to Hyprland and Omarchy. Every shortcut can be changed under **Ke
 
 Ctrl+Super+arrows move focus. Ctrl+Super+Shift+arrows swap. Super+arrows is left for Cinnamon's window snapping.
 
+Omarchy's pseudotile and pop-out are Super+P and Super+O. Cinnamon already binds those (switch monitors, and orientation lock), so MintyWM uses the same letters with Shift. Even sizes is Ctrl+Super+=, because Super+Alt+= is the magnifier.
+
 | Keys | Action |
 |---|---|
 | **Super + T** | Float or tile |
@@ -126,20 +131,20 @@ Ctrl+Super+arrows move focus. Ctrl+Super+Shift+arrows swap. Super+arrows is left
 | **Super + Alt + F** | Fill the work area |
 | **Super + Ctrl + F** | Monocle |
 | **Super + J** | Toggle split direction |
-| **Super + P** | Pseudotile |
-| **Super + O** | Pop out and pin |
+| **Super + Shift + P** | Pseudotile |
+| **Super + Shift + O** | Pop out and pin |
 | **Super + W** | Close the window |
 | **Ctrl + Super + /** | Cheat sheet |
 | **Super + = / -** | Wider / narrower |
 | **Super + Shift + = / -** | Taller / shorter |
-| **Super + Alt + =** | Even sizes on this workspace |
+| **Ctrl + Super + =** | Even sizes on this workspace |
 | **Ctrl + Super + arrows** | Focus |
 | **Ctrl + Super + Shift + arrows** | Swap |
 | **Super + Ctrl + T** | Pause or resume tiling everywhere |
 | **Super + Alt + T** | This workspace only |
 | **Super + Shift + R** | Re-tile now |
 
-Cinnamon still owns Super+arrow snapping, workspace switching (Ctrl+Alt+arrows) and Alt+Tab. MintyWM does not take those.
+Left with Cinnamon, on a stock install: Super+O (orientation lock), Super+P (switch monitors), Super+Alt+= and Super+Alt+- (magnifier), Super+arrows (snap), Super+Shift+arrows (another monitor), Super+D (show desktop), Super+E (home), Super+L (Looking Glass), Super+S (desklets), Super+Space (keyboard layout), Super+C and Super+N (calendar and notifications), Ctrl+Alt+arrows (workspaces), and Alt+Tab. Super+1 through Super+9 belong to the grouped window list.
 
 **Resizing.** Drag a tile's edge, or use the resize keys. The other tiles make room. Sizes are remembered per workspace. The status applet's menu, and *Tiling → Window sizes*, can reset them.
 
@@ -213,10 +218,10 @@ Open **System Settings → Extensions → MintyWM → Configure** (the gear icon
 
 | Page | Option | Default |
 |---|---|---|
-| **Tiling** | Inner gap (between windows) | 30 px |
-| | Outer gap (screen edge) | 30 px |
+| **Tiling** | Inner gap (between windows) | 8 px |
+| | Outer gap (screen edge) | 8 px |
 | | Minimum tile width / height | 200 / 120 px |
-| | Resize step (one press of Super+L / Super+H) | 5 % |
+| | Resize step (one press of Super+= / Super+-) | 5 % |
 | | Reset tile sizes on every workspace | button |
 | | Size of windows that float | 60 % of the screen |
 | | Keep floating windows on top | on |
@@ -249,7 +254,21 @@ Open **System Settings → Extensions → MintyWM → Configure** (the gear icon
 
 **The applet shows `?`.** The extension isn't running. Enable MintyWM under *Extensions*.
 
-**A shortcut clashes with something.** Change it under *Keyboard* in the settings.
+**A shortcut clashes with something.** Change it under *Keyboard* in the settings. An install that still has the old Super+O, Super+P or Super+Alt+= binding is moved to the 1.1 default on the next start, unless you had already changed that shortcut yourself.
+
+To see shortcuts you have changed from the defaults:
+
+```bash
+dconf dump /org/cinnamon/desktop/keybindings/
+```
+
+To list the bindings Cinnamon is actually using (defaults plus your changes):
+
+```bash
+for s in org.cinnamon.desktop.keybindings org.cinnamon.desktop.keybindings.wm org.cinnamon.desktop.keybindings.media-keys; do
+  gsettings list-recursively "$s"
+done
+```
 
 **Windows look cramped or tiny.** Raise the minimum tile size or lower the gaps. Extra windows are left out of the layout (pink border) once tiles would drop below the minimum.
 

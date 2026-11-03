@@ -2,7 +2,7 @@
     "uuid": "mintywm@leematthewjackson",
     "name": "MintyWM",
     "description": "Dynamic tiling for Cinnamon. Dwindle split tree, Hyprland-style keys, and windows kept on screen at 1080p.",
-    "version": "0.10",
+    "version": "1.1-rc",
     "author": "Lee Matthew Jackson",
     "website": "https://leematthewjackson.com",
     "url": "https://github.com/leematthewjackson/MintyWM",

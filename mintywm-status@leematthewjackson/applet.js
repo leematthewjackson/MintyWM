@@ -1,4 +1,4 @@
-// MintyWM Status - panel indicator for the MintyWM extension.
+// MintyWM Status 1.1 RC — panel indicator for the MintyWM extension.
 // By Lee Matthew Jackson - leematthewjackson.com
 //
 // Copyright (C) 2026 Lee Matthew Jackson

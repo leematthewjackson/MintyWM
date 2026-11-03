@@ -1,4 +1,4 @@
-# MintyWM Status
+# MintyWM Status 1.1 RC
 
 A panel indicator for the **MintyWM** tiling extension (a separate download).
 **Requires the MintyWM extension to be installed and enabled.**

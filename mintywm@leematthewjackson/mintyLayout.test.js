@@ -105,6 +105,9 @@ assert(solved.overflow.length + solved.cells.length === 10, "everyone is placed 
 assert(ML.DEFAULT_KEYS.keyToggleFloat === "<Super>t", "float is Super+T");
 assert(ML.DEFAULT_KEYS.keyFullscreen === "<Super>f", "fullscreen is Super+F");
 assert(ML.DEFAULT_KEYS.keyToggleSplit === "<Super>j", "toggle split is Super+J");
+assert(ML.DEFAULT_KEYS.keyPseudo === "<Super><Shift>p", "pseudotile leaves Super+P to Cinnamon");
+assert(ML.DEFAULT_KEYS.keyPop === "<Super><Shift>o", "pop-out leaves Super+O to Cinnamon");
+assert(ML.DEFAULT_KEYS.keyResetSizes === "<Super><Control>equal", "even sizes leaves the magnifier chord");
 assert(ML.DEFAULT_KEYS.keyCheatSheet === "<Super><Control>slash", "cheat sheet is Ctrl+Super+/");
 assert(ML.DEFAULT_KEYS.keyFocusLeft === "<Super><Control>Left", "focus leaves Super+arrows to Cinnamon");
 assert(!ML.DEFAULT_KEYS.keyFocusNext, "there is no focus-next binding");

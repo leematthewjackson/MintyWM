@@ -1,4 +1,4 @@
-# MintyWM
+# MintyWM 1.1 RC
 
 Dynamic Tiling Window Management for Cinnamon.
 By Lee Matthew Jackson - leematthewjackson.com - @leematthewjackson@mastodon.social
@@ -21,6 +21,9 @@ needs this extension.
 | Super+Shift+T | always float this app, or stop |
 | Super+F | fullscreen |
 | Super+J | toggle split direction |
+| Super+Shift+P | pseudotile (Super+P switches monitors) |
+| Super+Shift+O | pop out and pin (Super+O is orientation lock) |
+| Ctrl+Super+= | even tile sizes (Super+Alt+= is the magnifier) |
 | Ctrl+Super+/ | cheat sheet |
 | Super+Ctrl+T | pause or resume tiling everywhere |
 
