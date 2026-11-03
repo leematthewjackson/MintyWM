@@ -132,7 +132,7 @@ class MintyWMStatus extends Applet.TextIconApplet {
                 if (s.on) {
                     label = String(s.tiled) + (s.overflow ? "+" + s.overflow : "");
                     tip = "MintyWM: ON on workspace " + ws + " (" + s.tiled + " tiled, " +
-                        s.floating + " floating" + (s.overflow ? ", " + s.overflow + " parked because they didn't fit" : "") + ")." + mode;
+                        s.floating + " floating" + (s.overflow ? ", " + s.overflow + (s.overflow === 1 ? " didn't fit and is floating" : " didn't fit and are floating") : "") + ")." + mode;
                     kind = "on";
                 } else if (s.globalOn === false) {
                     label = "off";
@@ -183,7 +183,7 @@ class MintyWMStatus extends Applet.TextIconApplet {
             add("Tiling is off on workspace " + ws, null, false);
         }
         if (s.overflow) {
-            add(s.overflow + (s.overflow === 1 ? " window didn't fit and was parked on screen" : " windows didn't fit and were parked on screen"), null, false);
+            add(s.overflow + (s.overflow === 1 ? " window didn't fit, so it is floating" : " windows didn't fit, so they are floating"), null, false);
         }
         if (s.mode && s.mode !== "tile") add("Layout: " + s.mode, null, false);
         try {

@@ -150,6 +150,8 @@ Left with Cinnamon, on a stock install: Super+O (orientation lock), Super+P (swi
 
 **Resizing.** Drag a tile's edge, or use the resize keys. The other tiles make room. Sizes are remembered per workspace. The status applet's menu, and *Tiling → Window sizes*, can reset them.
 
+**When a window does not fit.** If another tile would be smaller than the minimum, or smaller than the app itself allows, the newest window floats instead. You can move it and it stays there. The windows are stepped apart so each title bar shows. When a tiled window closes, the oldest of those floats rejoins. Super+T pulls one back in, which can float a different window.
+
 ---
 
 ## Using MintyWM

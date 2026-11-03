@@ -353,7 +353,7 @@ function cascadeRect(area, index, percent) {
     var p = Math.max(20, Math.min(90, percent || 60)) / 100;
     var w = Math.max(1, Math.min(area.width, Math.round(area.width * p)));
     var h = Math.max(1, Math.min(area.height, Math.round(area.height * p)));
-    var step = 28;
+    var step = 64;   // far enough apart that the next window's title bar is visible
     var maxX = Math.max(0, area.width - w);
     var maxY = Math.max(0, area.height - h);
     var off = Math.min((index || 0) * step, Math.max(maxX, maxY));
