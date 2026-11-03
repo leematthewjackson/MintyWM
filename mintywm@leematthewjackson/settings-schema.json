@@ -179,7 +179,7 @@
         },
         "sec-keys-direction": {
             "type": "section",
-            "title": "Direction (Hyprland / Omarchy)",
+            "title": "Focus and swap",
             "keys": [
                 "keyFocusLeft",
                 "keyFocusRight",
@@ -208,8 +208,8 @@
         "max": 64,
         "step": 1,
         "units": "px",
-        "description": "Gap between windows and the screen or panel edges",
-        "tooltip": "The focus border is drawn in this gap, so keep it at least as wide as the border."
+        "description": "Outer gap",
+        "tooltip": "Space between the tiles and the screen edge or panels. Keep it at least as wide as the border."
     },
     "minTileWidth": {
         "type": "spinbutton",
@@ -219,7 +219,7 @@
         "step": 10,
         "units": "px",
         "description": "Smallest tile width",
-        "tooltip": "When more windows are open than fit, the extra ones are parked on screen as floating windows. 0 means no limit."
+        "tooltip": "Extra windows are parked on screen instead of being squeezed smaller. 0 means no limit."
     },
     "minTileHeight": {
         "type": "spinbutton",
@@ -229,7 +229,7 @@
         "step": 10,
         "units": "px",
         "description": "Smallest tile height",
-        "tooltip": "When more windows are open than fit, the extra ones are parked on screen as floating windows. 0 means no limit."
+        "tooltip": "Extra windows are parked on screen instead of being squeezed smaller. 0 means no limit."
     },
     "floatSizePercent": {
         "type": "spinbutton",
@@ -238,8 +238,8 @@
         "max": 90,
         "step": 5,
         "units": "%",
-        "description": "Size of a newly floated window",
-        "tooltip": "Used when a window you float has no sensible earlier size. It is centred on its monitor."
+        "description": "Size when first floated",
+        "tooltip": "Used when the window has no earlier size to restore. It is centred on its monitor."
     },
     "notify": {
         "type": "switch",
@@ -249,13 +249,13 @@
     "debug": {
         "type": "switch",
         "default": false,
-        "description": "Log why windows are or aren't tiled (for bug reports)",
-        "tooltip": "Writes a line per window to the Cinnamon log after each layout change. You can also run global.mintywm.dump() in Looking Glass (Alt+F2, lg) at any time."
+        "description": "Log why each window is tiled or not",
+        "tooltip": "One line per window in the Cinnamon log. Or run global.mintywm.dump() in Looking Glass (Alt+F2, lg)."
     },
     "borders": {
         "type": "switch",
         "default": true,
-        "description": "Draw a border around the focused and floating windows"
+        "description": "Border on the focused window, and on floating ones"
     },
     "focusColor": {
         "type": "colorchooser",
@@ -286,8 +286,8 @@
         "max": 24,
         "step": 1,
         "units": "px",
-        "description": "Window corner radius (all corners)",
-        "tooltip": "Match your theme's window corners so the border hugs them. 0 gives square corners.",
+        "description": "Corner radius",
+        "tooltip": "Match your theme so the border hugs the window. 0 is square.",
         "dependency": "!cornerEach"
     },
     "cornerEach": {
@@ -345,7 +345,7 @@
     },
     "superNumHelp": {
         "type": "label",
-        "description": "Grouped window list uses Super+1 to Super+9 to focus or minimize the panel button in that slot. Turn that off first: Applets, Grouped window list, General, Hot Keys, then disable \"Enable Super+number shortcut to switch/open apps\". Restart Cinnamon (Alt+F2, r). Use this switch or Cinnamon's own Workspace shortcuts, not both."
+        "description": "Grouped window list uses these keys. Turn off its Super+number shortcut first: Applets, Grouped window list, General, Hot Keys. Then restart Cinnamon (Alt+F2, r)."
     },
     "keyToggleTiling": {
         "type": "keybinding",
@@ -360,7 +360,7 @@
     "keyRetile": {
         "type": "keybinding",
         "default": "<Super><Shift>r",
-        "description": "Re-tile everything now"
+        "description": "Re-tile now"
     },
     "aboutName": {
         "type": "label",
@@ -380,23 +380,23 @@
     },
     "floatHelp1": {
         "type": "label",
-        "description": "These apps open as floating windows instead of being tiled. Untick a row to stop floating that app, or delete the row."
+        "description": "These apps open floating. Untick a row to pause it, or delete the row."
     },
     "floatHelp2": {
         "type": "label",
-        "description": "Easiest way to add an app: click its window and press Super+Shift+T. Press it again to undo."
+        "description": "Add one by focusing its window and pressing Super+Shift+T. Press again to undo."
     },
     "floatHelp3": {
         "type": "label",
-        "description": "Or find a window's class yourself: in a terminal run  xprop WM_CLASS  then click the window, and use the first name in quotes."
+        "description": "Or run xprop WM_CLASS, click the window, and use the first name in quotes."
     },
     "floatHelp4": {
         "type": "label",
-        "description": "A * matches anything, so  cinnamon-settings*  covers every Cinnamon Settings window. Capital letters do not matter."
+        "description": "* matches anything, and capitals do not matter. cinnamon-settings* covers every Cinnamon Settings window."
     },
     "floatHelp5": {
         "type": "label",
-        "description": "Title contains is optional: leave it empty to float every window of that app. Super+T on one window tiles just that window and leaves this list alone."
+        "description": "Title contains is optional. Super+T floats one window and does not change this list."
     },
     "floatRules": {
         "type": "list",
@@ -452,17 +452,17 @@
     "keyAlwaysFloat": {
         "type": "keybinding",
         "default": "<Super><Shift>t",
-        "description": "Always float (or stop floating) the focused window's app"
+        "description": "Always float this app, or stop"
     },
     "floatOnTop": {
         "type": "switch",
         "default": true,
         "description": "Keep floating windows on top of the tiled ones",
-        "tooltip": "Only windows MintyWM floats are affected, and only while tiling is on. Windows you pinned on top yourself are left alone."
+        "tooltip": "Only windows MintyWM floats, and only while tiling is on. Windows you pinned yourself are left alone."
     },
     "wsHelp": {
         "type": "label",
-        "description": "Tiling is never applied on the workspaces listed here. Super+Alt+T flips the workspace you are on and updates this box."
+        "description": "Tiling stays off on these workspaces. Super+Alt+T toggles the one you are on."
     },
     "noTileWorkspaces": {
         "type": "entry",
@@ -478,11 +478,11 @@
     "keyResetSizes": {
         "type": "keybinding",
         "default": "<Super><Control>equal",
-        "description": "Even tile sizes again on this workspace"
+        "description": "Even out tile sizes on this workspace"
     },
     "resizeHelp": {
         "type": "label",
-        "description": "Resize with the keys below, or drag a tile's edge. Split direction stays until you toggle it. Sizes are kept per workspace."
+        "description": "Drag a tile's edge, or use the keys below. Sizes are remembered per workspace."
     },
     "resizeStep": {
         "type": "spinbutton",
@@ -506,7 +506,7 @@
     "keyPop": {
         "type": "keybinding",
         "default": "<Super><Shift>o",
-        "description": "Pop the focused window out and pin it"
+        "description": "Pop out and pin the focused window"
     },
     "keyFullscreen": {
         "type": "keybinding",
@@ -601,7 +601,7 @@
     "keyCheatSheet": {
         "type": "keybinding",
         "default": "<Super><Control>slash",
-        "description": "Show or hide the key cheat sheet"
+        "description": "Show the key cheat sheet"
     },
     "layoutTrees": {
         "type": "generic",
@@ -609,6 +609,6 @@
     },
     "keysHelp": {
         "type": "label",
-        "description": "One set of keys, close to Hyprland and Omarchy. Super+P and Super+O are Cinnamon's (switch monitors, orientation lock), so pseudotile and pop-out are Super+Shift+P and Super+Shift+O. Even sizes is Ctrl+Super+=, because Super+Alt+= zooms the magnifier. Ctrl+Super+arrows move focus so Cinnamon keeps Super+arrow snapping. The cheat sheet is Ctrl+Super+/, because Super+/ often never arrives. The empty box beside a shortcut is an optional second binding, not a missing one. Cinnamon will refuse a shortcut it already uses."
+        "description": "Defaults follow Hyprland, shifted where Cinnamon already uses the key. The empty box beside a shortcut is an optional second binding, not a missing one."
     }
 }
