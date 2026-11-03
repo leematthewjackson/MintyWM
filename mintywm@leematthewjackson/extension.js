@@ -19,6 +19,9 @@
 //     (Super+arrows stays with Cinnamon's own snapping)
 //   - Super+T float, Super+F fullscreen, Super+J togglesplit, Ctrl+Super+/ cheat sheet
 //   - Windows that do not fit are parked on screen, never left past the edge
+//   - A new tiled window stays hidden until it is already in its tile, so it
+//     does not flash where the app last left it. Floating windows, and
+//     workspaces where tiling is off, are never hidden for this.
 //   - Super+Shift+P pseudotile, Super+Shift+O pop-out (bare Super+P / Super+O
 //     belong to Cinnamon: monitors and orientation lock)
 // Settings: System Settings > Extensions > MintyWM > the gear button. Changes apply live.
@@ -262,6 +265,8 @@ class MintyWM {
         this._widNext = 1;
         this._cells = new Map();     // window -> { key, area, rect, chain, id }
         this._hidden = new Set();    // actors hidden by monocle / maximize
+        this._veil = new Set();        // new windows hidden until the first tile sticks
+        this._veilTimers = new Map();  // window -> cap timer, so nothing stays invisible
         this._cheat = null;
         this._cheatKey = 0;
         this._writingKeys = false;
@@ -285,14 +290,26 @@ class MintyWM {
         this._bindSettings();
         this._noTile = parseWorkspaceList(CONFIG.noTileWorkspaces);
         this._connect(global.display, "window-created", (display, win) => {
-            if (this._consider(win)) this._settle();
+            if (!this._consider(win)) return;
+            // Hide before the first paint, then place now instead of after the
+            // settle delay. A second pass still runs, for apps that resize late.
+            this._conceal(win);
+            this._retile();
+            this._settle();
         });
         // Only our own windows matter: menus, tooltips and popups map and unmap all the time.
         for (const sig of ["map", "minimize", "unminimize"]) {
             this._connect(global.window_manager, sig, (wm, actor) => {
                 let win = null;
                 try { win = actor ? actor.meta_window : null; } catch (e) {}
-                if (win && this._known.has(win)) this._settle();
+                if (!win || !this._known.has(win)) return;
+                // The actor often appears only on map. Hide it again before Cinnamon paints
+                // the saved position, then place immediately.
+                if (sig === "map" && this._veil.has(win)) {
+                    this._conceal(win);
+                    this._retile();
+                }
+                this._settle();
             });
         }
         this._connect(global.window_manager, "switch-workspace", () => this._settle());
@@ -354,6 +371,7 @@ class MintyWM {
         }
         this._unbindWorkspaceKeys();
         this._hideCheat();
+        this._revealAll();
         this._unhideAll();
         if (this._settings) {
             try { this._settings.finalize(); } catch (e) {}
@@ -397,6 +415,8 @@ class MintyWM {
         this._treeSaveId = 0;
         this._modes = {};
         this._hidden.clear();
+        this._veil.clear();
+        this._veilTimers.clear();
         this._settleId = 0;
         this._settleSince = 0;
         this._afterId = 0;
@@ -1239,6 +1259,8 @@ class MintyWM {
                 if (win.window_type !== Meta.WindowType.NORMAL) return;
                 this._unwatch(win);
                 this._track(win);
+                this._conceal(win);
+                this._retile();
                 this._settle();
             }));
             ids.push(win.connect("unmanaged", () => this._unwatch(win)));
@@ -1275,6 +1297,8 @@ class MintyWM {
         add("position-changed", () => this._checkTarget(win));
         add("size-changed", () => {
             this._checkTarget(win);
+            // A new window often grows into its real size after the first place.
+            if (this._veil.has(win)) this._settle();
             if (this._mayHaveBorder(win)) this._refreshBorder(win);
         });
         this._winConns.set(win, ids);
@@ -1297,6 +1321,7 @@ class MintyWM {
         this._reinsert.delete(win);
         this._wids.delete(win);
         this._hidden.delete(win);
+        this._reveal(win);
         this._winConns.delete(win);  // window is being destroyed; nothing to disconnect
         this._dropBorder(win);
         if (this._lastFocus === win) this._lastFocus = null;
@@ -1439,6 +1464,90 @@ class MintyWM {
         } catch (e) {}
     }
 
+    // How long a brand new window may stay invisible while it is moved into its tile.
+    // Past this it is shown anyway, so a stubborn app cannot leave a blank screen.
+
+    // Will we tile this window once it has a real size? The on-screen check is
+    // skipped: a new window is often still tiny, and that is exactly when it
+    // must stay hidden. Floating windows and tiling-off workspaces are not hidden.
+    _mightTile(win) {
+        try {
+            const active = global.workspace_manager.get_active_workspace();
+            if (!this._tilingForWindow(win)) return false;
+            if (win.window_type !== Meta.WindowType.NORMAL) return false;
+            if (win.is_override_redirect()) return false;
+            if (win.minimized) return false;
+            if (win.is_skip_taskbar()) return false;
+            if (win.is_on_all_workspaces()) return false;
+            if (win.is_fullscreen()) return false;
+            if (win.get_transient_for()) return false;
+            if (typeof win.allows_move === "function" && !win.allows_move()) return false;
+            if (win.resizeable === false) return false;
+            if (this._floating.has(win)) return false;
+            if (active && !win.located_on_workspace(active)) return false;
+            return true;
+        } catch (e) {
+            return false;
+        }
+    }
+
+    _conceal(win) {
+        if (!win) return;
+        if (!this._veil.has(win)) {
+            this._applyRule(win);
+            if (!this._mightTile(win)) return;
+            this._veil.add(win);
+            const cap = this._later(450, () => this._reveal(win));
+            this._veilTimers.set(win, cap);
+        }
+        try {
+            const actor = win.get_compositor_private();
+            if (actor) actor.hide();
+        } catch (e) {}
+    }
+
+    _reveal(win) {
+        if (!win) return;
+        const cap = this._veilTimers.get(win);
+        if (cap) {
+            this._cancel(cap);
+            this._veilTimers.delete(win);
+        }
+        if (!this._veil.has(win)) return;
+        this._veil.delete(win);
+        if (this._hidden.has(win)) return;   // monocle still wants it hidden
+        try {
+            const actor = win.get_compositor_private();
+            if (actor) actor.show();
+        } catch (e) {}
+    }
+
+    _revealAll() {
+        for (const win of [...this._veil]) this._reveal(win);
+    }
+
+    _rehideVeiled() {
+        for (const win of this._veil) {
+            try {
+                const actor = win.get_compositor_private();
+                if (actor) actor.hide();
+            } catch (e) {}
+        }
+    }
+
+    // Show a concealed window once its frame is where we just put it.
+    _releaseVeilIfPlaced(win) {
+        if (!win || !this._veil.has(win)) return;
+        try {
+            const t = this._targets.get(win);
+            if (!t) return;
+            const f = win.get_frame_rect();
+            if (Math.abs(f.x - t.x) <= 2 && Math.abs(f.y - t.y) <= 2) this._reveal(win);
+        } catch (e) {
+            this._reveal(win);
+        }
+    }
+
     _unhideAll() {
         for (const win of [...this._hidden]) {
             try {
@@ -1493,10 +1602,15 @@ class MintyWM {
         this._overflow.clear();
         this._cells.clear();
         this._unhideAll();
+        this._rehideVeiled();   // monocle unhide must not flash a window still waiting for its tile
         for (const win of this._order) this._applyRule(win);
+        for (const win of [...this._veil]) {
+            if (!this._mightTile(win)) this._reveal(win);
+        }
         this._syncAbove();
         const workspace = global.workspace_manager.get_active_workspace();
         if (!this._tilingHere(workspace)) {
+            this._revealAll();
             this._refreshBorders();
             this._stuckCheck(0);
             this._changed();
@@ -1528,6 +1642,7 @@ class MintyWM {
                     : ML.soleRect(area, CONFIG.innerGap, CONFIG.outerGap);
                 this._cells.set(main, { key: key, area: area, rect: rect, chain: [], id: this._wid(main) });
                 if (this._place(main, rect, area)) grew = true;
+                this._releaseVeilIfPlaced(main);
                 for (const w of members) if (w !== main) this._hideActor(w);
                 continue;
             }
@@ -1554,6 +1669,7 @@ class MintyWM {
                 if (cell.pseudo) rect = ML.pseudoRect(rect, CONFIG.floatSizePercent);
                 this._cells.set(win, { key: key, area: area, rect: rect, chain: cell.chain || [], id: cell.id });
                 if (this._place(win, rect, area)) grew = true;
+                this._releaseVeilIfPlaced(win);
             }
             solved.overflow.forEach((id, i) => {
                 const win = byId.get(id);
@@ -1562,6 +1678,7 @@ class MintyWM {
                 const park = ML.cascadeRect(area, i, CONFIG.floatSizePercent);
                 this._cells.set(win, { key: key, area: area, rect: park, chain: [], id: id });
                 this._place(win, park, area);
+                this._releaseVeilIfPlaced(win);
             });
         }
         this._refreshBorders();
@@ -1606,6 +1723,7 @@ class MintyWM {
             };
             if (f.x === rect.x && f.y === rect.y && f.width === rect.width && f.height === rect.height) {
                 this._targets.set(win, { x: rect.x, y: rect.y, tries: 3 });
+                this._releaseVeilIfPlaced(win);
                 return false;
             }
             win.move_resize_frame(true, rect.x, rect.y, rect.width, rect.height);
@@ -1631,6 +1749,7 @@ class MintyWM {
             }
             // Set after the request, so the window's own move signal during it is ignored.
             this._targets.set(win, { x: tx, y: ty, tries: 3 });
+            this._releaseVeilIfPlaced(win);
             return grew;
         } catch (e) {
             global.logError(e);
@@ -1667,17 +1786,23 @@ class MintyWM {
         try {
             if (!this._tilingForWindow(win) || this._floating.has(win) || !this._known.has(win)) {
                 this._targets.delete(win);
+                this._reveal(win);
                 return false;
             }
             const f = win.get_frame_rect();
-            if (f.x === t.x && f.y === t.y) return false;
+            if (f.x === t.x && f.y === t.y) {
+                this._releaseVeilIfPlaced(win);
+                return false;
+            }
             if (t.tries <= 0) {
                 this._targets.delete(win);
+                this._reveal(win);   // gave up correcting; don't leave it invisible
                 return false;
             }
             t.tries--;
             t.busy = true;   // our own move below emits position-changed; don't recurse
             try { win.move_frame(true, t.x, t.y); } finally { t.busy = false; }
+            this._releaseVeilIfPlaced(win);
             return true;
         } catch (e) {
             this._targets.delete(win);   // window went away
