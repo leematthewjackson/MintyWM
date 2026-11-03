@@ -26,8 +26,9 @@ needs this extension.
 | Ctrl+Super+= | even tile sizes (Super+Alt+= is the magnifier) |
 | Ctrl+Super+/ | cheat sheet |
 | Super+Ctrl+T | pause or resume tiling everywhere |
+| Super+1 to Super+9 | switch workspace. Optional, and off until you turn it on |
 
-Change any of them under **Keyboard**.
+Change any of them under **Keyboard**. Super+1 to Super+9 stay with Cinnamon’s grouped window list until **Keyboard → Workspace numbers** is on. Turn off that applet’s “Enable Super+number shortcut to switch/open apps” first, then restart Cinnamon (Alt+F2, `r`).
 
 ## Floating apps
 

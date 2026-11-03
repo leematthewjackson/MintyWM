@@ -144,7 +144,9 @@ Omarchy's pseudotile and pop-out are Super+P and Super+O. Cinnamon already binds
 | **Super + Alt + T** | This workspace only |
 | **Super + Shift + R** | Re-tile now |
 
-Left with Cinnamon, on a stock install: Super+O (orientation lock), Super+P (switch monitors), Super+Alt+= and Super+Alt+- (magnifier), Super+arrows (snap), Super+Shift+arrows (another monitor), Super+D (show desktop), Super+E (home), Super+L (Looking Glass), Super+S (desklets), Super+Space (keyboard layout), Super+C and Super+N (calendar and notifications), Ctrl+Alt+arrows (workspaces), and Alt+Tab. Super+1 through Super+9 belong to the grouped window list.
+Left with Cinnamon, on a stock install: Super+O (orientation lock), Super+P (switch monitors), Super+Alt+= and Super+Alt+- (magnifier), Super+arrows (snap), Super+Shift+arrows (another monitor), Super+D (show desktop), Super+E (home), Super+L (Looking Glass), Super+S (desklets), Super+Space (keyboard layout), Super+C and Super+N (calendar and notifications), Ctrl+Alt+arrows (workspaces), and Alt+Tab. Super+1 through Super+9 belong to the grouped window list until you turn on Workspace numbers below.
+
+**Workspace numbers (optional, off).** Under **Keyboard → Workspace numbers**, Super+1 through Super+9 switch to that workspace. A workspace that does not exist is not created, and the window is not moved. Grouped window list uses those keys to focus or minimize panel buttons. Turn that off first: **Applets → Grouped window list → General → Hot Keys**, then disable **Enable Super+number shortcut to switch/open apps**. Restart Cinnamon (Alt+F2, `r`). Use this switch or Cinnamon’s own Workspace shortcuts, not both.
 
 **Resizing.** Drag a tile's edge, or use the resize keys. The other tiles make room. Sizes are remembered per workspace. The status applet's menu, and *Tiling → Window sizes*, can reset them.
 

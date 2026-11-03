@@ -38,6 +38,7 @@
             "type": "page",
             "title": "Keyboard",
             "sections": [
+                "sec-keys-workspaces",
                 "sec-keys-modes",
                 "sec-keys-direction",
                 "sec-keys-resize"
@@ -107,6 +108,14 @@
                 "radiusTopRight",
                 "radiusBottomLeft",
                 "radiusBottomRight"
+            ]
+        },
+        "sec-keys-workspaces": {
+            "type": "section",
+            "title": "Workspace numbers",
+            "keys": [
+                "superNumWorkspaces",
+                "superNumHelp"
             ]
         },
         "sec-keys-modes": {
@@ -327,6 +336,16 @@
         "units": "px",
         "description": "Bottom-right corner radius",
         "dependency": "cornerEach"
+    },
+    "superNumWorkspaces": {
+        "type": "switch",
+        "default": false,
+        "description": "Super+1 through Super+9 switch workspace",
+        "tooltip": "Off by default. Switches to that workspace if it already exists. Does not create one, and does not move the window."
+    },
+    "superNumHelp": {
+        "type": "label",
+        "description": "Grouped window list uses Super+1 to Super+9 to focus or minimize the panel button in that slot. Turn that off first: Applets, Grouped window list, General, Hot Keys, then disable \"Enable Super+number shortcut to switch/open apps\". Restart Cinnamon (Alt+F2, r). Use this switch or Cinnamon's own Workspace shortcuts, not both."
     },
     "keyToggleTiling": {
         "type": "keybinding",

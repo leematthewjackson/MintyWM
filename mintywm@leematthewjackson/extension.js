@@ -77,6 +77,8 @@ const CONFIG = {
     // zipped back onto the current windows when the counts still match.
     layoutTrees: {},
     noTileWorkspaces: "",    // workspace numbers where tiling is off, e.g. "4, 9" or "7-9"
+    // Optional. Off so Grouped window list keeps Super+1..9 unless you ask.
+    superNumWorkspaces: false,
     innerGap: 8,     // pixels between windows
     outerGap: 8,     // pixels between windows and screen/panel edges
     minTileWidth: 200,   // never make a tile smaller than this; extra windows are left alone
@@ -273,6 +275,7 @@ class MintyWM {
         this._noTile = new Set();       // workspace numbers (1-based) where tiling is off
         this._lastDump = "";
         this._wayland = false;
+        this._wsKeyWarned = false;   // one notice if Super+1..9 are still taken
     }
 
     enable() {
@@ -349,6 +352,7 @@ class MintyWM {
         for (const id of KEY_IDS.concat(RETIRED_KEYS)) {
             try { Main.keybindingManager.removeHotKey("mintywm-" + id); } catch (e) {}
         }
+        this._unbindWorkspaceKeys();
         this._hideCheat();
         this._unhideAll();
         if (this._settings) {
@@ -423,6 +427,7 @@ class MintyWM {
             this._settings.bindProperty(dir, "debug", "debug", () => { this._lastDump = ""; this._debugLog(); }, null);
             this._settings.bindProperty(dir, "floatRules", "floatRules", () => this._reapplyRules(), null);
             this._settings.bindProperty(dir, "noTileWorkspaces", "noTileWorkspaces", () => this._onWorkspacesChanged(), null);
+            this._settings.bindProperty(dir, "superNumWorkspaces", "superNumWorkspaces", () => this._onKeyChanged(), null);
         } catch (e) {
             global.logError(e);
         }
@@ -542,6 +547,62 @@ class MintyWM {
             } catch (e) {
                 global.logError(e);
             }
+        }
+        this._bindWorkspaceKeys();
+    }
+
+    _unbindWorkspaceKeys() {
+        for (let n = 1; n <= 9; n++) {
+            try { Main.keybindingManager.removeHotKey("mintywm-ws-" + n); } catch (e) {}
+        }
+    }
+
+    // Super+1..9, only while the switch is on. Grouped window list owns them
+    // by default, so a refused bind is reported once instead of on every key.
+    _bindWorkspaceKeys() {
+        this._unbindWorkspaceKeys();
+        if (!CONFIG.superNumWorkspaces) {
+            this._wsKeyWarned = false;
+            return;
+        }
+        let refused = 0;
+        for (let n = 1; n <= 9; n++) {
+            const number = n;
+            try {
+                const ok = Main.keybindingManager.addHotKey("mintywm-ws-" + number, "<Super>" + number, () => this._goWorkspace(number));
+                if (ok === false) refused++;
+            } catch (e) {
+                refused++;
+                global.logError(e);
+            }
+        }
+        if (!refused) {
+            this._wsKeyWarned = false;
+            return;
+        }
+        global.logWarning("MintyWM: could not bind Super+1-9 (" + refused + " refused). Grouped window list may still own them.");
+        if (this._wsKeyWarned) return;
+        this._wsKeyWarned = true;
+        this._say("Super+1-9 are still used by Grouped window list. Turn off its Super+number shortcut, then restart Cinnamon (Alt+F2, r).");
+    }
+
+    // Switch to workspace n as Cinnamon numbers them. Do not create one.
+    _goWorkspace(n) {
+        let count = 0;
+        try { count = global.workspace_manager.get_n_workspaces(); } catch (e) { return; }
+        if (n < 1 || n > count) {
+            this._say("No workspace " + n + (count ? ". You have " + count + "." : "."));
+            return;
+        }
+        try {
+            const ws = global.workspace_manager.get_workspace_by_index(n - 1);
+            if (!ws) {
+                this._say("No workspace " + n + ".");
+                return;
+            }
+            ws.activate(global.get_current_time());
+        } catch (e) {
+            global.logError(e);
         }
     }
 
@@ -983,6 +1044,9 @@ class MintyWM {
             const accel = keyLabel(CONFIG[pair[0]]);
             if (!accel) continue;
             rows.push({ keys: accel, action: pair[1] });
+            if (pair[0] === "keyToggleWorkspace" && CONFIG.superNumWorkspaces) {
+                rows.push({ keys: "Super+1-9", action: "Switch to that workspace" });
+            }
         }
         return rows;
     }
