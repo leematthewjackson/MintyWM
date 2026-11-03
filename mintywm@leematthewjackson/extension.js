@@ -651,6 +651,9 @@ class MintyWM {
             if (next) {
                 try { next.activate(global.get_current_time()); } catch (e) {}
             }
+            // Size it on the workspace it now lives on, while that workspace
+            // is still hidden. Otherwise it snaps into its tile when you arrive.
+            this._layoutWorkspace(ws, true);
             this._retile();
         } catch (e) {
             global.logError(e);
@@ -1687,6 +1690,29 @@ class MintyWM {
             this._debugLog();
             return;
         }
+        const laid = this._layoutWorkspace(workspace, false);
+        this._syncAbove();
+        if (laid.told.length === 1) this._say("This window did not fit, so it is floating. Super+T tiles it again.");
+        else if (laid.told.length > 1) this._say(laid.told.length + " windows did not fit, so they are floating. Super+T tiles one again.");
+        this._refreshBorders();
+        this._afterPlace(0);
+        if (laid.grew && this._relayout < 2) {
+            // The window's real minimum is known now. Lay out once more in this
+            // same turn so the notice and the float are not a beat behind.
+            this._relayout++;
+            try { this._retile(); } finally { this._relayout--; }
+        }
+        this._stuckCheck(0);
+        this._changed();
+        this._debugLog();
+    }
+
+    // Tile one workspace. quiet: it is not on screen, so only move the windows.
+    // Do not hide actors. The next visible layout would show them again.
+    _layoutWorkspace(workspace, quiet) {
+        const told = [];
+        let grew = false;
+        if (!workspace || !this._tilingHere(workspace) || !ML) return { grew: grew, told: told };
         const byMonitor = new Map();
         for (const win of this._order) {
             if (!this._inTree(win, workspace)) continue;
@@ -1695,8 +1721,6 @@ class MintyWM {
             if (!byMonitor.has(mon)) byMonitor.set(mon, []);
             byMonitor.get(mon).push(win);
         }
-        let grew = false;
-        const told = [];
         for (const [mon, wins] of byMonitor) {
             let area;
             try { area = this._workArea(workspace, mon, wins[0]); } catch (e) { continue; }
@@ -1714,8 +1738,10 @@ class MintyWM {
                     : ML.soleRect(area, CONFIG.innerGap, CONFIG.outerGap);
                 this._cells.set(main, { key: key, area: area, rect: rect, chain: [], id: this._wid(main) });
                 if (this._place(main, rect, area)) grew = true;
-                this._releaseVeilIfPlaced(main);
-                for (const w of members) if (w !== main) this._hideActor(w);
+                if (!quiet) {
+                    this._releaseVeilIfPlaced(main);
+                    for (const w of members) if (w !== main) this._hideActor(w);
+                }
                 continue;
             }
             const tree = this._reconcileTree(key, wins, area);
@@ -1738,31 +1764,19 @@ class MintyWM {
                 if (cell.pseudo) rect = ML.pseudoRect(rect, CONFIG.floatSizePercent);
                 this._cells.set(win, { key: key, area: area, rect: rect, chain: cell.chain || [], id: cell.id });
                 if (this._place(win, rect, area)) grew = true;
-                this._releaseVeilIfPlaced(win);
+                if (!quiet) this._releaseVeilIfPlaced(win);
             }
             for (const id of solved.overflow) {
                 const win = byId.get(id);
                 if (!win) continue;
-                if (this._floatDidNotFit(win, area) && !this._parkTold.has(win)) {
+                const fresh = this._floatDidNotFit(win, area);
+                if (!quiet && fresh && !this._parkTold.has(win)) {
                     this._parkTold.add(win);
                     told.push(win);
                 }
             }
         }
-        this._syncAbove();
-        if (told.length === 1) this._say("This window did not fit, so it is floating. Super+T tiles it again.");
-        else if (told.length > 1) this._say(told.length + " windows did not fit, so they are floating. Super+T tiles one again.");
-        this._refreshBorders();
-        this._afterPlace(0);
-        if (grew && this._relayout < 2) {
-            // The window's real minimum is known now. Lay out once more in this
-            // same turn so the notice and the float are not a beat behind.
-            this._relayout++;
-            try { this._retile(); } finally { this._relayout--; }
-        }
-        this._stuckCheck(0);
-        this._changed();
-        this._debugLog();
+        return { grew: grew, told: told };
     }
 
     // Windows the user asked to tile are kept. Everyone else stays in arrival
