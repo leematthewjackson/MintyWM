@@ -589,8 +589,9 @@ class MintyWM {
         }
     }
 
-    // Super+1..9 switches, Super+Shift+1..9 moves the focused window there.
-    // Only while the switch is on. Grouped window list owns both by default.
+    // Super+1..9 switches, Super+Shift+1..9 sends the focused window there
+    // without following it. Only while the switch is on. Grouped window list
+    // owns both by default.
     _bindWorkspaceKeys() {
         this._unbindWorkspaceKeys();
         if (!CONFIG.superNumWorkspaces) {
@@ -628,27 +629,46 @@ class MintyWM {
         try { ws.activate(global.get_current_time()); } catch (e) { global.logError(e); }
     }
 
-    // Move the focused window to workspace n and go with it. Do not create one.
+    // Send the focused window to workspace n and stay here. Do not create one.
+    // Cinnamon follows a focused window onto its new workspace, so focus a
+    // window that is still here and come straight back.
     _moveToWorkspace(n) {
         const win = global.display.focus_window;
         if (!win) return;
         const ws = this._workspaceByNumber(n);
         if (!ws) return;
+        let here = null;
+        try { here = global.workspace_manager.get_active_workspace(); } catch (e) { return; }
+        if (here && ws === here) return;
         try {
             if (typeof win.is_on_all_workspaces === "function" && win.is_on_all_workspaces()) {
                 this._say("This window is on every workspace");
                 return;
             }
+            const next = this._windowLeftBehind(here, win);
             if (typeof win.change_workspace === "function") win.change_workspace(ws);
-            ws.activate(global.get_current_time());
-            try { win.activate(global.get_current_time()); } catch (e) {}
-            // The workspace change also schedules a layout after a short quiet
-            // period. Tile now, or the window sits at its old size until that fires.
-            this._bump(win);
+            if (here) here.activate(global.get_current_time());
+            if (next) {
+                try { next.activate(global.get_current_time()); } catch (e) {}
+            }
             this._retile();
         } catch (e) {
             global.logError(e);
         }
+    }
+
+    // The window to focus after the current one has been sent away.
+    _windowLeftBehind(workspace, gone) {
+        if (!workspace) return null;
+        for (let i = this._order.length - 1; i >= 0; i--) {
+            const other = this._order[i];
+            if (other === gone) continue;
+            try {
+                if (other.minimized || !other.located_on_workspace(workspace)) continue;
+                return other;
+            } catch (e) {}
+        }
+        return null;
     }
 
     _workspaceByNumber(n) {
@@ -1110,7 +1130,7 @@ class MintyWM {
             rows.push({ keys: accel, action: pair[1] });
             if (pair[0] === "keyToggleWorkspace" && CONFIG.superNumWorkspaces) {
                 rows.push({ keys: "Super+1-9", action: "Switch to that workspace" });
-                rows.push({ keys: "Super+Shift+1-9", action: "Move the focused window there" });
+                rows.push({ keys: "Super+Shift+1-9", action: "Send the focused window there" });
             }
         }
         return rows;
