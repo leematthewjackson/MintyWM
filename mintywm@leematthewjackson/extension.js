@@ -261,6 +261,7 @@ class MintyWM {
         this._parkTold = new Set();  // already told the user this window did not fit
         this._parkSpot = new Set();  // already given a float position; never auto-move again
         this._relayout = 0;          // follow-up passes after a window refuses its tile
+        this._note = null;           // the one on-screen notice; a newer action replaces it
         this._trees = {};            // "workspace:monitor" -> split tree
         this._treeSaveId = 0;
         this._usedSave = {};         // saved tree applied at most once per key per session
@@ -376,6 +377,7 @@ class MintyWM {
         }
         this._unbindWorkspaceKeys();
         this._hideCheat();
+        this._dismissNote();
         this._revealAll();
         this._unhideAll();
         if (this._settings) {
@@ -2203,9 +2205,37 @@ class MintyWM {
         }
     }
 
+    _dismissNote() {
+        const note = this._note;
+        this._note = null;
+        if (!note) return;
+        try {
+            if (typeof note.destroy === "function") note.destroy();
+        } catch (e) {}
+    }
+
+    // One notice at a time. Cinnamon otherwise queues each one and plays them
+    // slowly, so a burst of keys shows the latest message straight away.
     _say(msg) {
-        if (!CONFIG.notify) return;
-        try { Main.notify("MintyWM", msg); } catch (e) {}
+        if (!CONFIG.notify || !msg) return;
+        try {
+            if (this._note && typeof this._note.update === "function") {
+                this._note.update("MintyWM", msg);
+                return;
+            }
+        } catch (e) {
+            this._note = null;
+        }
+        this._dismissNote();
+        try {
+            const note = Main.notify("MintyWM", msg);
+            this._note = note || null;
+            if (note && typeof note.connect === "function") {
+                note.connect("destroy", () => {
+                    if (this._note === note) this._note = null;
+                });
+            }
+        } catch (e) {}
     }
 }
 
