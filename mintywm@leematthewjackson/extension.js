@@ -642,6 +642,10 @@ class MintyWM {
             if (typeof win.change_workspace === "function") win.change_workspace(ws);
             ws.activate(global.get_current_time());
             try { win.activate(global.get_current_time()); } catch (e) {}
+            // The workspace change also schedules a layout after a short quiet
+            // period. Tile now, or the window sits at its old size until that fires.
+            this._bump(win);
+            this._retile();
         } catch (e) {
             global.logError(e);
         }
