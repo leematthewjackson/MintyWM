@@ -228,13 +228,22 @@ function shiftWorkspaceList(set, removed, count) {
     return out;
 }
 
-// "<Super><Alt>t" -> "Super+Alt+T" (only the first binding, if there are several).
+// "<Super><Control>t::<Alt>t" -> "Super+Ctrl+T or Alt+T"
 function keyLabel(binding) {
-    const first = String(binding || "").split("::")[0];
-    if (!first) return "";
-    const key = first.replace(/<[^>]*>/g, "");
-    const mods = (first.match(/<([^>]*)>/g) || []).map((m) => m.slice(1, -1));
-    return mods.concat(key.length === 1 ? key.toUpperCase() : key).join("+");
+    return String(binding || "").split("::").map((part) => oneKeyLabel(part.trim())).filter(Boolean).join(" or ");
+}
+
+function oneKeyLabel(accel) {
+    if (!accel) return "";
+    const mods = (accel.match(/<([^>]*)>/g) || []).map((raw) => {
+        const name = raw.slice(1, -1);
+        if (name === "Primary" || name === "Control") return "Ctrl";
+        return name;
+    });
+    const key = accel.replace(/<[^>]*>/g, "");
+    const names = { equal: "=", minus: "-", plus: "+", slash: "/", space: "Space" };
+    const shown = key.length === 1 ? key.toUpperCase() : (names[key] || key);
+    return mods.concat(shown).filter(Boolean).join("+");
 }
 // --- layout:end
 
@@ -275,6 +284,8 @@ class MintyWM {
         this._veilTimers = new Map();  // window -> cap timer, so nothing stays invisible
         this._cheat = null;
         this._cheatKey = 0;
+        this._cheatModal = false;
+        this._cheatEsc = false;
         this._writingKeys = false;
         this._borders = new Map();      // window -> { box, parent, sig, style, shown }
         this._lastFocus = null;
@@ -1140,6 +1151,14 @@ class MintyWM {
     }
 
     _hideCheat() {
+        if (this._cheatEsc) {
+            try { Main.keybindingManager.removeHotKey("mintywm-cheat-esc"); } catch (e) {}
+            this._cheatEsc = false;
+        }
+        if (this._cheatModal && this._cheat) {
+            try { Main.popModal(this._cheat); } catch (e) {}
+            this._cheatModal = false;
+        }
         if (this._cheatKey) {
             try { global.stage.disconnect(this._cheatKey); } catch (e) {}
             this._cheatKey = 0;
@@ -1150,30 +1169,94 @@ class MintyWM {
         }
     }
 
+    _cheatSections() {
+        const groups = [
+            ["Tiling", ["keyToggleTiling", "keyToggleWorkspace"]],
+            ["Window", ["keyToggleFloat", "keyAlwaysFloat", "keyPop", "keyFullscreen", "keyMaximize", "keyMonocle", "keyToggleSplit", "keyPseudo", "keyClose"]],
+            ["Focus", ["keyFocusLeft", "keyFocusRight", "keyFocusUp", "keyFocusDown", "keySwapLeft", "keySwapRight", "keySwapUp", "keySwapDown"]],
+            ["Size", ["keyGrowWidth", "keyShrinkWidth", "keyGrowHeight", "keyShrinkHeight", "keyResetSizes", "keyRetile", "keyCheatSheet"]],
+        ];
+        const byId = {};
+        if (ML) for (const pair of ML.KEY_LABELS) byId[pair[0]] = pair[1];
+        const sections = [];
+        for (const group of groups) {
+            const rows = [];
+            for (const id of group[1]) {
+                const accel = keyLabel(CONFIG[id]);
+                if (!accel || !byId[id]) continue;
+                rows.push({ keys: accel, action: byId[id] });
+                if (id === "keyToggleWorkspace" && CONFIG.superNumWorkspaces) {
+                    rows.push({ keys: "Super+1-9", action: "Switch to that workspace" });
+                    rows.push({ keys: "Super+Shift+1-9", action: "Send the focused window there" });
+                }
+            }
+            if (rows.length) sections.push({ title: group[0], rows: rows });
+        }
+        return sections;
+    }
+
+    _cheatColumn(sections) {
+        const col = new St.BoxLayout({ vertical: true });
+        for (const section of sections) {
+            const head = new St.Label({ text: section.title });
+            head.set_style("font-size: 11px; font-weight: bold; color: rgb(0,255,204); padding-top: 14px; padding-bottom: 6px;");
+            col.add_child(head);
+            for (const row of section.rows) {
+                const line = new St.BoxLayout({ vertical: false });
+                const keys = new St.Label({ text: row.keys });
+                keys.set_style("font-family: monospace; font-size: 13px; min-width: 230px; padding: 2px 16px 2px 0;");
+                const action = new St.Label({ text: row.action });
+                action.set_style("font-size: 13px; color: rgb(186,196,204); padding: 2px 0;");
+                line.add_child(keys);
+                line.add_child(action);
+                col.add_child(line);
+            }
+        }
+        return col;
+    }
+
     _toggleCheat() {
         if (this._cheat) { this._hideCheat(); return; }
         try {
-            const monitor = Main.layoutManager.primaryMonitor || Main.layoutManager.monitors[0];
+            const index = global.display.get_current_monitor();
+            const monitor = (Main.layoutManager.monitors && Main.layoutManager.monitors[index]) ||
+                Main.layoutManager.primaryMonitor || Main.layoutManager.monitors[0];
             if (!monitor) return;
-            const layer = new St.Widget({ reactive: true, x: monitor.x, y: monitor.y, width: monitor.width, height: monitor.height });
-            layer.set_style("background-color: rgba(0,0,0,0.35);");
-            layer.connect("button-press-event", () => { this._hideCheat(); return Clutter.EVENT_STOP; });
+            const layer = new St.Widget({ reactive: true, can_focus: true, track_hover: true });
+            layer.set_position(monitor.x, monitor.y);
+            layer.set_size(monitor.width, monitor.height);
+            layer.set_style("background-color: rgba(0,0,0,0.55);");
+            const close = () => { this._hideCheat(); return Clutter.EVENT_STOP; };
+            layer.connect("button-press-event", close);
+            layer.connect("key-press-event", (actor, event) => {
+                try {
+                    if (event.get_key_symbol() === Clutter.KEY_Escape) return close();
+                } catch (e) {}
+                return Clutter.EVENT_PROPAGATE;
+            });
             const box = new St.BoxLayout({ vertical: true, reactive: true });
-            box.set_style("background-color: rgba(16,20,24,0.96); color: rgb(236,240,241); " +
-                "padding: 18px 22px; border-radius: 14px; border: 2px solid rgb(0,255,204);");
-            box.connect("button-press-event", () => Clutter.EVENT_STOP);
+            box.set_style("background-color: rgba(16,20,24,0.98); color: rgb(236,240,241); " +
+                "padding: 8px 28px 22px; border-radius: 14px; border: 2px solid rgb(0,255,204);");
+            const keep = () => Clutter.EVENT_STOP;
+            box.connect("button-press-event", keep);
+            box.connect("button-release-event", keep);
             const title = new St.Label({ text: "MintyWM" });
-            title.set_style("font-weight: bold; font-size: 16px; padding-bottom: 8px;");
+            title.set_style("font-weight: bold; font-size: 18px; padding-top: 12px;");
             box.add_child(title);
-            const hint = new St.Label({ text: "Press the cheat-sheet key again, or Escape, to close." });
-            hint.set_style("font-size: 12px; color: rgb(170,180,190); padding-bottom: 10px;");
+            const hint = new St.Label({ text: "These are your keys. Escape, or a click outside, closes this." });
+            hint.set_style("font-size: 12px; color: rgb(170,180,190); padding-bottom: 4px;");
             box.add_child(hint);
-            const body = new St.Label({ text: this._keyRows().map((r) => r.keys + "    " + r.action).join("\n") });
-            body.set_style("font-family: monospace; font-size: 13px;");
-            box.add_child(body);
+            const columns = new St.BoxLayout({ vertical: false });
+            const sections = this._cheatSections();
+            const mid = Math.ceil(sections.length / 2);
+            columns.add_child(this._cheatColumn(sections.slice(0, mid)));
+            const gap = new St.Widget();
+            gap.set_style("min-width: 36px;");
+            columns.add_child(gap);
+            columns.add_child(this._cheatColumn(sections.slice(mid)));
+            box.add_child(columns);
             layer.add_child(box);
             Main.uiGroup.add_child(layer);
-            // Centre after the box knows its size. A second layout pass is enough.
             this._later(30, () => {
                 try {
                     const w = box.get_width();
@@ -1182,17 +1265,28 @@ class MintyWM {
                 } catch (e) {}
             });
             this._cheat = layer;
-            this._cheatKey = global.stage.connect("key-press-event", (actor, event) => {
+            try {
+                if (Main.pushModal(layer)) {
+                    this._cheatModal = true;
+                    try { layer.grab_key_focus(); } catch (e) {}
+                }
+            } catch (e) {}
+            try {
+                if (Main.keybindingManager.addHotKey("mintywm-cheat-esc", "Escape", () => this._hideCheat()) !== false) {
+                    this._cheatEsc = true;
+                }
+            } catch (e) {}
+            this._cheatKey = global.stage.connect("captured-event", (actor, event) => {
                 try {
-                    if (event.get_key_symbol() === Clutter.KEY_Escape) {
-                        this._hideCheat();
-                        return Clutter.EVENT_STOP;
+                    if (event.type() === Clutter.EventType.KEY_PRESS && event.get_key_symbol() === Clutter.KEY_Escape) {
+                        return close();
                     }
                 } catch (e) {}
                 return Clutter.EVENT_PROPAGATE;
             });
         } catch (e) {
             global.logError(e);
+            this._hideCheat();
         }
     }
 

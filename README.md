@@ -63,7 +63,7 @@ To remove it, disable the extension, take the applet off the panel, then delete 
 
 ## Keys
 
-Close to Hyprland. Change any of them under **Extensions → MintyWM → Keyboard**. The cheat sheet (**Ctrl+Super+/**) shows the keys you actually have.
+Close to Hyprland. Change any of them under **Extensions → MintyWM → Keyboard**. The cheat sheet (**Ctrl+Super+/**) shows the keys you actually have, including a second binding. Escape, or a click outside it, closes it. Super+1–9 only appear there when Workspace numbers is on.
 
 | Keys | What it does |
 |---|---|
