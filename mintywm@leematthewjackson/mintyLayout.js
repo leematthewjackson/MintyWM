@@ -555,9 +555,9 @@ var KEY_LABELS = [
     ["keyShrinkWidth", "Make the focused tile narrower"],
     ["keyGrowHeight", "Make the focused tile taller"],
     ["keyShrinkHeight", "Make the focused tile shorter"],
-    ["keyResetSizes", "Even tile sizes on this workspace"],
-    ["keyRetile", "Re-tile everything now"],
-    ["keyCheatSheet", "Show or hide this cheat sheet"],
+    ["keyResetSizes", "Even out tile sizes on this workspace"],
+    ["keyRetile", "Re-tile now"],
+    ["keyCheatSheet", "Show this cheat sheet"],
 ];
 
 var DEFAULT_KEYS = {
