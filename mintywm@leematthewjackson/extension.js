@@ -259,6 +259,8 @@ class MintyWM {
         this._overflow = new Set();  // windows that did not fit, floating until there is room
         this._parked = [];           // those windows, oldest first
         this._parkTold = new Set();  // already told the user this window did not fit
+        this._parkSpot = new Set();  // already given a float position; never auto-move again
+        this._relayout = 0;          // follow-up passes after a window refuses its tile
         this._trees = {};            // "workspace:monitor" -> split tree
         this._treeSaveId = 0;
         this._usedSave = {};         // saved tree applied at most once per key per session
@@ -414,6 +416,8 @@ class MintyWM {
         this._overflow.clear();
         this._parked = [];
         this._parkTold.clear();
+        this._parkSpot.clear();
+        this._relayout = 0;
         this._cells.clear();
         if (this._treeSaveId) this._saveTreesNow();
         this._trees = {};
@@ -1327,6 +1331,7 @@ class MintyWM {
         this._overflow.delete(win);
         this._parked = this._parked.filter((w) => w !== win);
         this._parkTold.delete(win);
+        this._parkSpot.delete(win);
         this._cells.delete(win);
         this._reinsert.delete(win);
         this._wids.delete(win);
@@ -1629,41 +1634,27 @@ class MintyWM {
             return;
         }
         const byMonitor = new Map();
-        const claim = (win) => {
-            let mon = 0;
-            try { mon = win.get_monitor(); } catch (e) { return; }
-            if (!byMonitor.has(mon)) byMonitor.set(mon, []);
-            byMonitor.get(mon).push(win);
-        };
         for (const win of this._order) {
-            if (this._inTree(win, workspace)) claim(win);
-        }
-        for (const win of this._parked) {
-            if (!this._canRejoin(win, workspace)) continue;
+            if (!this._inTree(win, workspace)) continue;
             let mon = 0;
             try { mon = win.get_monitor(); } catch (e) { continue; }
             if (!byMonitor.has(mon)) byMonitor.set(mon, []);
+            byMonitor.get(mon).push(win);
         }
         let grew = false;
         const told = [];
         for (const [mon, wins] of byMonitor) {
-            const waiting = this._parked.filter((w) => {
-                try { return this._canRejoin(w, workspace) && w.get_monitor() === mon; } catch (e) { return false; }
-            });
-            const sample = wins[0] || waiting[0];
-            if (!sample) continue;
             let area;
-            try { area = this._workArea(workspace, mon, sample); } catch (e) { continue; }
+            try { area = this._workArea(workspace, mon, wins[0]); } catch (e) { continue; }
             const key = (workspace.index() + 1) + ":" + mon;
-            let members = wins.filter((w) => {
+            const members = wins.filter((w) => {
                 try { return !w.is_fullscreen(); } catch (e) { return true; }
             });
             const mode = this._modes[key];
-            if ((mode === "monocle" || mode === "max") && (members.length || wins.length)) {
+            if ((mode === "monocle" || mode === "max") && members.length) {
                 this._reconcileTree(key, wins, area);
                 const focus = global.display.focus_window;
                 const main = members.indexOf(focus) >= 0 ? focus : members[0];
-                if (!main) continue;
                 const rect = mode === "max"
                     ? { x: area.x, y: area.y, width: area.width, height: area.height }
                     : ML.soleRect(area, CONFIG.innerGap, CONFIG.outerGap);
@@ -1672,14 +1663,6 @@ class MintyWM {
                 this._releaseVeilIfPlaced(main);
                 for (const w of members) if (w !== main) this._hideActor(w);
                 continue;
-            }
-            const focus = global.display.focus_window;
-            const focusId = focus && members.indexOf(focus) >= 0 ? this._wid(focus) : null;
-            for (const win of waiting) {
-                if (!this._layoutFits(members.concat([win]), area, this._trees[key], focusId)) break;
-                this._unpark(win);
-                members.push(win);
-                wins.push(win);
             }
             const tree = this._reconcileTree(key, wins, area);
             const priority = this._tilePriority(members);
@@ -1713,11 +1696,16 @@ class MintyWM {
             }
         }
         this._syncAbove();
-        if (told.length === 1) this._say("This window did not fit, so it is floating");
-        else if (told.length > 1) this._say(told.length + " windows did not fit, so they are floating");
+        if (told.length === 1) this._say("This window did not fit, so it is floating. Super+T tiles it again.");
+        else if (told.length > 1) this._say(told.length + " windows did not fit, so they are floating. Super+T tiles one again.");
         this._refreshBorders();
         this._afterPlace(0);
-        if (grew) this._settle();   // a window refused to shrink: lay out again around its real size
+        if (grew && this._relayout < 2) {
+            // The window's real minimum is known now. Lay out once more in this
+            // same turn so the notice and the float are not a beat behind.
+            this._relayout++;
+            try { this._retile(); } finally { this._relayout--; }
+        }
         this._stuckCheck(0);
         this._changed();
         this._debugLog();
@@ -1741,37 +1729,9 @@ class MintyWM {
         return mins;
     }
 
-    _layoutFits(members, area, tree, focusId) {
-        if (!members.length || !ML) return true;
-        const ids = members.map((win) => this._wid(win));
-        const next = ML.reconcile(tree || null, ids, {
-            area: area,
-            inner: CONFIG.innerGap,
-            outer: CONFIG.outerGap,
-            focusId: focusId || null,
-        });
-        const solved = ML.solve(next, area, CONFIG.innerGap, CONFIG.outerGap,
-            CONFIG.minTileWidth, CONFIG.minTileHeight, this._minsFor(members), this._tilePriority(members));
-        return solved.overflow.length === 0;
-    }
-
-    _canRejoin(win, workspace) {
-        try {
-            return !!win && this._known.has(win) && !this._userTouched.has(win) && !this._ruled.has(win) &&
-                !win.minimized && !win.is_fullscreen() && win.located_on_workspace(workspace);
-        } catch (e) {
-            return false;
-        }
-    }
-
-    _unpark(win) {
-        this._parked = this._parked.filter((w) => w !== win);
-        this._overflow.delete(win);
-        if (!this._userTouched.has(win) && !this._ruled.has(win)) this._floating.delete(win);
-    }
-
-    // Float a window that does not fit. Returns true the first time, so a later
-    // layout does not drag it back to the cascade after the user has moved it.
+    // Float a window that does not fit. The cascade position is applied once:
+    // after that the window stays wherever the user left it, even if a later
+    // pass floats it again.
     _floatDidNotFit(win, area) {
         const fresh = this._parked.indexOf(win) < 0;
         if (fresh) this._parked.push(win);
@@ -1779,7 +1739,8 @@ class MintyWM {
         this._overflow.add(win);
         this._targets.delete(win);
         this._reveal(win);
-        if (!fresh) return false;
+        if (this._parkSpot.has(win)) return fresh;
+        this._parkSpot.add(win);
         try {
             this._untile(win);
             if (win.get_maximized()) win.unmaximize(Meta.MaximizeFlags.BOTH);
@@ -1797,7 +1758,7 @@ class MintyWM {
         } catch (e) {
             global.logError(e);
         }
-        return true;
+        return fresh;
     }
 
     // If Cinnamon's own edge tiling or snapping holds the window, let go of it first,
