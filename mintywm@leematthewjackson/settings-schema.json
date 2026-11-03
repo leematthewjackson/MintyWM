@@ -219,7 +219,7 @@
         "step": 10,
         "units": "px",
         "description": "Smallest tile width",
-        "tooltip": "Extra windows are parked on screen instead of being squeezed smaller. 0 means no limit."
+        "tooltip": "Extra windows float instead, and stay where you put them. 0 means no limit."
     },
     "minTileHeight": {
         "type": "spinbutton",
@@ -229,7 +229,7 @@
         "step": 10,
         "units": "px",
         "description": "Smallest tile height",
-        "tooltip": "Extra windows are parked on screen instead of being squeezed smaller. 0 means no limit."
+        "tooltip": "Extra windows float instead, and stay where you put them. 0 means no limit."
     },
     "floatSizePercent": {
         "type": "spinbutton",

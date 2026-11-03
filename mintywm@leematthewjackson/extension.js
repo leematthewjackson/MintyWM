@@ -18,7 +18,8 @@
 //   - Ctrl+Super+arrows move focus, Ctrl+Super+Shift+arrows swap
 //     (Super+arrows stays with Cinnamon's own snapping)
 //   - Super+T float, Super+F fullscreen, Super+J togglesplit, Ctrl+Super+/ cheat sheet
-//   - Windows that do not fit are parked on screen, never left past the edge
+//   - Windows that do not fit float, and stay where you leave them. The oldest
+//     one rejoins the layout when a tiled window closes.
 //   - A new tiled window stays hidden until it is already in its tile, so it
 //     does not flash where the app last left it. Floating windows, and
 //     workspaces where tiling is off, are never hidden for this.
@@ -255,7 +256,12 @@ class MintyWM {
         this._stuckId = 0;           // the check for window pictures drawn in the wrong place
         this._targets = new Map();   // window -> { x, y, tries }: where the last pass put it
         this._minSize = new Map();   // window -> { w, h }: it refused to be made smaller than this
-        this._overflow = new Set();  // eligible windows that did not fit, parked back on screen
+        this._overflow = new Set();  // windows that did not fit, floating until there is room
+        this._parked = [];           // those windows, oldest first
+        this._parkTold = new Set();  // already told the user this window did not fit
+        this._parkSpot = new Set();  // already given a float position; never auto-move again
+        this._relayout = 0;          // follow-up passes after a window refuses its tile
+        this._note = null;           // the one on-screen notice; a newer action replaces it
         this._trees = {};            // "workspace:monitor" -> split tree
         this._treeSaveId = 0;
         this._usedSave = {};         // saved tree applied at most once per key per session
@@ -371,6 +377,7 @@ class MintyWM {
         }
         this._unbindWorkspaceKeys();
         this._hideCheat();
+        this._dismissNote();
         this._revealAll();
         this._unhideAll();
         if (this._settings) {
@@ -409,6 +416,10 @@ class MintyWM {
         this._targets.clear();
         this._minSize.clear();
         this._overflow.clear();
+        this._parked = [];
+        this._parkTold.clear();
+        this._parkSpot.clear();
+        this._relayout = 0;
         this._cells.clear();
         if (this._treeSaveId) this._saveTreesNow();
         this._trees = {};
@@ -763,6 +774,7 @@ class MintyWM {
         if (!win || !this._known.has(win)) return;
         this._userTouched.add(win);    // from now on this window ignores the floating-apps list
         this._ruled.delete(win);
+        this._parked = this._parked.filter((w) => w !== win);
         if (this._floating.has(win)) {
             this._floating.delete(win);
             this._bump(win);           // rejoins the layout as the newest window
@@ -1038,6 +1050,7 @@ class MintyWM {
         if (!win || !this._known.has(win)) return;
         this._userTouched.add(win);
         this._ruled.delete(win);
+        this._parked = this._parked.filter((w) => w !== win);
         if (this._floating.has(win)) {
             this._floating.delete(win);
             this._bump(win);
@@ -1181,6 +1194,7 @@ class MintyWM {
         if (d && !this._floating.has(win)) {
             this._floating.add(win);
             this._ruled.add(win);
+            this._parked = this._parked.filter((w) => w !== win);
             if (this._saved.has(win)) this._restoreFloat(win);   // we had already tiled it
         } else if (!d && this._ruled.has(win)) {
             this._floating.delete(win);   // its rule was removed or switched off
@@ -1317,6 +1331,9 @@ class MintyWM {
         this._targets.delete(win);
         this._minSize.delete(win);
         this._overflow.delete(win);
+        this._parked = this._parked.filter((w) => w !== win);
+        this._parkTold.delete(win);
+        this._parkSpot.delete(win);
         this._cells.delete(win);
         this._reinsert.delete(win);
         this._wids.delete(win);
@@ -1400,8 +1417,9 @@ class MintyWM {
         const ws = global.workspace_manager.get_active_workspace();
         let tiled = 0, floating = 0, overflow = 0;
         for (const win of this._order) {
-            if (this._floating.has(win)) { if (this._navigable(win, ws)) floating++; }
-            else if (this._eligible(win, ws)) { if (this._overflow.has(win)) overflow++; else tiled++; }
+            if (this._parked.indexOf(win) >= 0) overflow++;
+            else if (this._floating.has(win)) { if (this._navigable(win, ws)) floating++; }
+            else if (this._eligible(win, ws)) tiled++;
         }
         return { tiled, floating, overflow };
     }
@@ -1620,11 +1638,13 @@ class MintyWM {
         const byMonitor = new Map();
         for (const win of this._order) {
             if (!this._inTree(win, workspace)) continue;
-            const mon = win.get_monitor();
+            let mon = 0;
+            try { mon = win.get_monitor(); } catch (e) { continue; }
             if (!byMonitor.has(mon)) byMonitor.set(mon, []);
             byMonitor.get(mon).push(win);
         }
         let grew = false;
+        const told = [];
         for (const [mon, wins] of byMonitor) {
             let area;
             try { area = this._workArea(workspace, mon, wins[0]); } catch (e) { continue; }
@@ -1632,9 +1652,9 @@ class MintyWM {
             const members = wins.filter((w) => {
                 try { return !w.is_fullscreen(); } catch (e) { return true; }
             });
-            const tree = this._reconcileTree(key, wins, area);
             const mode = this._modes[key];
             if ((mode === "monocle" || mode === "max") && members.length) {
+                this._reconcileTree(key, wins, area);
                 const focus = global.display.focus_window;
                 const main = members.indexOf(focus) >= 0 ? focus : members[0];
                 const rect = mode === "max"
@@ -1646,12 +1666,9 @@ class MintyWM {
                 for (const w of members) if (w !== main) this._hideActor(w);
                 continue;
             }
-            const priority = members.map((w) => this._wid(w));
-            const mins = {};
-            for (const w of members) {
-                const m = this._minSize.get(w);
-                if (m) mins[this._wid(w)] = m;
-            }
+            const tree = this._reconcileTree(key, wins, area);
+            const priority = this._tilePriority(members);
+            const mins = this._minsFor(members);
             let geometry = tree;
             for (const w of wins) {
                 try {
@@ -1671,22 +1688,79 @@ class MintyWM {
                 if (this._place(win, rect, area)) grew = true;
                 this._releaseVeilIfPlaced(win);
             }
-            solved.overflow.forEach((id, i) => {
+            for (const id of solved.overflow) {
                 const win = byId.get(id);
-                if (!win) return;
-                this._overflow.add(win);
-                const park = ML.cascadeRect(area, i, CONFIG.floatSizePercent);
-                this._cells.set(win, { key: key, area: area, rect: park, chain: [], id: id });
-                this._place(win, park, area);
-                this._releaseVeilIfPlaced(win);
-            });
+                if (!win) continue;
+                if (this._floatDidNotFit(win, area) && !this._parkTold.has(win)) {
+                    this._parkTold.add(win);
+                    told.push(win);
+                }
+            }
         }
+        this._syncAbove();
+        if (told.length === 1) this._say("This window did not fit, so it is floating. Super+T tiles it again.");
+        else if (told.length > 1) this._say(told.length + " windows did not fit, so they are floating. Super+T tiles one again.");
         this._refreshBorders();
         this._afterPlace(0);
-        if (grew) this._settle();   // a window refused to shrink: lay out again around its real size
+        if (grew && this._relayout < 2) {
+            // The window's real minimum is known now. Lay out once more in this
+            // same turn so the notice and the float are not a beat behind.
+            this._relayout++;
+            try { this._retile(); } finally { this._relayout--; }
+        }
         this._stuckCheck(0);
         this._changed();
         this._debugLog();
+    }
+
+    // Windows the user asked to tile are kept. Everyone else stays in arrival
+    // order, so the newest of those is the one that floats when space runs out.
+    _tilePriority(members) {
+        const keep = [];
+        const rest = [];
+        for (const win of members) (this._userTouched.has(win) ? keep : rest).push(this._wid(win));
+        return keep.concat(rest);
+    }
+
+    _minsFor(members) {
+        const mins = {};
+        for (const win of members) {
+            const size = this._minSize.get(win);
+            if (size) mins[this._wid(win)] = size;
+        }
+        return mins;
+    }
+
+    // Float a window that does not fit. The cascade position is applied once:
+    // after that the window stays wherever the user left it, even if a later
+    // pass floats it again.
+    _floatDidNotFit(win, area) {
+        const fresh = this._parked.indexOf(win) < 0;
+        if (fresh) this._parked.push(win);
+        this._floating.add(win);
+        this._overflow.add(win);
+        this._targets.delete(win);
+        this._reveal(win);
+        if (this._parkSpot.has(win)) return fresh;
+        this._parkSpot.add(win);
+        try {
+            this._untile(win);
+            if (win.get_maximized()) win.unmaximize(Meta.MaximizeFlags.BOTH);
+            if (!this._saved.has(win)) {
+                const f = win.get_frame_rect();
+                this._saved.set(win, { x: f.x, y: f.y, width: f.width, height: f.height });
+            }
+            let slot = 0;
+            for (const other of this._parked) {
+                if (other === win) break;
+                try { if (other.get_monitor() === win.get_monitor()) slot++; } catch (e) {}
+            }
+            const park = ML.cascadeRect(area, slot, CONFIG.floatSizePercent);
+            win.move_resize_frame(true, park.x, park.y, park.width, park.height);
+        } catch (e) {
+            global.logError(e);
+        }
+        return fresh;
     }
 
     // If Cinnamon's own edge tiling or snapping holds the window, let go of it first,
@@ -2054,7 +2128,7 @@ class MintyWM {
                 const f = win.get_frame_rect();
                 const id = this._winIdentity(win) || { cls: "?", title: "" };
                 let why = this._skipReason(win, ws);
-                if (!why) why = this._overflow.has(win) ? "did not fit (minimum tile size)" : "tiled";
+                if (!why) why = this._parked.indexOf(win) >= 0 ? "floating (did not fit)" : "tiled";
                 const min = this._minSize.get(win);
                 line = "  " + (id.cls || id.inst || "?") + " \"" + id.title.slice(0, 40) + "\" " +
                     f.width + "x" + f.height + "+" + f.x + "+" + f.y + " monitor " + win.get_monitor() +
@@ -2131,9 +2205,37 @@ class MintyWM {
         }
     }
 
+    _dismissNote() {
+        const note = this._note;
+        this._note = null;
+        if (!note) return;
+        try {
+            if (typeof note.destroy === "function") note.destroy();
+        } catch (e) {}
+    }
+
+    // One notice at a time. Cinnamon otherwise queues each one and plays them
+    // slowly, so a burst of keys shows the latest message straight away.
     _say(msg) {
-        if (!CONFIG.notify) return;
-        try { Main.notify("MintyWM", msg); } catch (e) {}
+        if (!CONFIG.notify || !msg) return;
+        try {
+            if (this._note && typeof this._note.update === "function") {
+                this._note.update("MintyWM", msg);
+                return;
+            }
+        } catch (e) {
+            this._note = null;
+        }
+        this._dismissNote();
+        try {
+            const note = Main.notify("MintyWM", msg);
+            this._note = note || null;
+            if (note && typeof note.connect === "function") {
+                note.connect("destroy", () => {
+                    if (this._note === note) this._note = null;
+                });
+            }
+        } catch (e) {}
     }
 }
 

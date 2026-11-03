@@ -87,11 +87,14 @@ assert(clamped.y + clamped.height <= hd.height + 0.5, "clamped bottom edge");
 var pinned = ML.clampOrigin({ x: 100, y: 100, width: 2000, height: 1200 }, hd);
 assert(pinned.x === 0 && pinned.y === 0, "oversized frame pins to the origin");
 
-// Overflow parking stays on screen.
+// Overflow parking stays on screen, and each later window steps down by a title bar.
 for (var k = 0; k < 6; k++) {
     var park = ML.cascadeRect(hd, k, 60);
     assert(inside(park, hd), "cascade " + k);
 }
+var firstPark = ML.cascadeRect(hd, 0, 60);
+var nextPark = ML.cascadeRect(hd, 1, 60);
+assert(nextPark.y - firstPark.y >= 64 && nextPark.x - firstPark.x >= 64, "cascade shows the next title");
 
 // Minimum sizes drop extras instead of drawing slivers, and gaps shrink first.
 var many = [];
