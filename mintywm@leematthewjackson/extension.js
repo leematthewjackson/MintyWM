@@ -585,11 +585,12 @@ class MintyWM {
     _unbindWorkspaceKeys() {
         for (let n = 1; n <= 9; n++) {
             try { Main.keybindingManager.removeHotKey("mintywm-ws-" + n); } catch (e) {}
+            try { Main.keybindingManager.removeHotKey("mintywm-wsmove-" + n); } catch (e) {}
         }
     }
 
-    // Super+1..9, only while the switch is on. Grouped window list owns them
-    // by default, so a refused bind is reported once instead of on every key.
+    // Super+1..9 switches, Super+Shift+1..9 moves the focused window there.
+    // Only while the switch is on. Grouped window list owns both by default.
     _bindWorkspaceKeys() {
         this._unbindWorkspaceKeys();
         if (!CONFIG.superNumWorkspaces) {
@@ -597,21 +598,24 @@ class MintyWM {
             return;
         }
         let refused = 0;
-        for (let n = 1; n <= 9; n++) {
-            const number = n;
+        const bind = (id, accel, fn) => {
             try {
-                const ok = Main.keybindingManager.addHotKey("mintywm-ws-" + number, "<Super>" + number, () => this._goWorkspace(number));
-                if (ok === false) refused++;
+                if (Main.keybindingManager.addHotKey(id, accel, fn) === false) refused++;
             } catch (e) {
                 refused++;
                 global.logError(e);
             }
+        };
+        for (let n = 1; n <= 9; n++) {
+            const number = n;
+            bind("mintywm-ws-" + number, "<Super>" + number, () => this._goWorkspace(number));
+            bind("mintywm-wsmove-" + number, "<Super><Shift>" + number, () => this._moveToWorkspace(number));
         }
         if (!refused) {
             this._wsKeyWarned = false;
             return;
         }
-        global.logWarning("MintyWM: could not bind Super+1-9 (" + refused + " refused). Grouped window list may still own them.");
+        global.logWarning("MintyWM: could not bind Super+1-9 or Super+Shift+1-9 (" + refused + " refused). Grouped window list may still own them.");
         if (this._wsKeyWarned) return;
         this._wsKeyWarned = true;
         this._say("Super+1-9 are still used by Grouped window list. Turn off its Super+number shortcut, then restart Cinnamon (Alt+F2, r).");
@@ -619,21 +623,44 @@ class MintyWM {
 
     // Switch to workspace n as Cinnamon numbers them. Do not create one.
     _goWorkspace(n) {
+        const ws = this._workspaceByNumber(n);
+        if (!ws) return;
+        try { ws.activate(global.get_current_time()); } catch (e) { global.logError(e); }
+    }
+
+    // Move the focused window to workspace n and go with it. Do not create one.
+    _moveToWorkspace(n) {
+        const win = global.display.focus_window;
+        if (!win) return;
+        const ws = this._workspaceByNumber(n);
+        if (!ws) return;
+        try {
+            if (typeof win.is_on_all_workspaces === "function" && win.is_on_all_workspaces()) {
+                this._say("This window is on every workspace");
+                return;
+            }
+            if (typeof win.change_workspace === "function") win.change_workspace(ws);
+            ws.activate(global.get_current_time());
+            try { win.activate(global.get_current_time()); } catch (e) {}
+        } catch (e) {
+            global.logError(e);
+        }
+    }
+
+    _workspaceByNumber(n) {
         let count = 0;
-        try { count = global.workspace_manager.get_n_workspaces(); } catch (e) { return; }
+        try { count = global.workspace_manager.get_n_workspaces(); } catch (e) { return null; }
         if (n < 1 || n > count) {
             this._say("No workspace " + n + (count ? ". You have " + count + "." : "."));
-            return;
+            return null;
         }
         try {
             const ws = global.workspace_manager.get_workspace_by_index(n - 1);
-            if (!ws) {
-                this._say("No workspace " + n + ".");
-                return;
-            }
-            ws.activate(global.get_current_time());
+            if (!ws) this._say("No workspace " + n + ".");
+            return ws || null;
         } catch (e) {
             global.logError(e);
+            return null;
         }
     }
 
@@ -1079,6 +1106,7 @@ class MintyWM {
             rows.push({ keys: accel, action: pair[1] });
             if (pair[0] === "keyToggleWorkspace" && CONFIG.superNumWorkspaces) {
                 rows.push({ keys: "Super+1-9", action: "Switch to that workspace" });
+                rows.push({ keys: "Super+Shift+1-9", action: "Move the focused window there" });
             }
         }
         return rows;

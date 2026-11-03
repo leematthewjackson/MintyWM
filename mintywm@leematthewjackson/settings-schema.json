@@ -340,12 +340,12 @@
     "superNumWorkspaces": {
         "type": "switch",
         "default": false,
-        "description": "Super+1 through Super+9 switch workspace",
-        "tooltip": "Off by default. Switches to that workspace if it already exists. Does not create one, and does not move the window."
+        "description": "Super+1-9 switch workspace, Super+Shift+1-9 moves the window",
+        "tooltip": "Off by default. Does not create a workspace. Super+2 switches to workspace 2. Super+Shift+2 moves the focused window there and switches with it."
     },
     "superNumHelp": {
         "type": "label",
-        "description": "Grouped window list uses these keys. Turn off its Super+number shortcut first: Applets, Grouped window list, General, Hot Keys. Then restart Cinnamon (Alt+F2, r)."
+        "description": "Super+1-9 switches. Super+Shift+1-9 moves the focused window there and switches with it. Neither creates a workspace. Grouped window list uses these keys for its panel buttons, including with Shift. Turn that off first: Applets, Grouped window list, General, Hot Keys, then disable Enable Super+number shortcut to switch/open apps. Restart Cinnamon (Alt+F2, r). Do not also give Cinnamon's own workspace shortcuts these keys."
     },
     "keyToggleTiling": {
         "type": "keybinding",
