@@ -7,7 +7,7 @@ Open a window and it tiles. Close one and the rest fill the space. The layout is
 Cinnamon stays in charge of panels, Alt+Tab and its own shortcuts. MintyWM only adds tiling, and an optional way to switch workspaces or send a window to one.
 
 > [!WARNING]
-> **Alpha software.** Things will break and settings may change. **Please [report bugs here](https://github.com/leematthewjackson/MintyWM/issues/new)**, with your distro, Cinnamon version and what happened.
+> **BETA software.** Things will break and settings may change. **Please [report bugs here](https://github.com/leematthewjackson/MintyWM/issues/new)**, with your distro, Cinnamon version and what happened.
 
 By [Lee Matthew Jackson](https://leematthewjackson.com) · Mastodon: [@leematthewjackson@mastodon.social](https://mastodon.social/@leematthewjackson)
 
